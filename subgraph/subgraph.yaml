@@ -1,0 +1,89 @@
+specVersion: 0.0.5
+description: >
+  Fruit Rush on-chain indexer — indexes cosmetic NFT mints, boast score
+  attestations, and tournament lifecycle events from three contracts on Celo.
+repository: https://github.com/fruit-rush/fruit-rush
+schema:
+  file: ./schema.graphql
+dataSources:
+  # ─── FruitRushCosmetics (ERC-1155 + UUPS proxy) ─────────────────────────────
+  - kind: ethereum
+    name: FruitRushCosmetics
+    network: celo
+    source:
+      address: "0x054ecDa9539a6ac8cE5F262AD803C477182d35c6" # REPLACE_ME if redeployed
+      abi: FruitRushCosmetics
+      startBlock: 72064337  # block cosmetics proxy was deployed
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - CosmeticItem
+        - CosmeticBalance
+        - CosmeticTransfer
+      abis:
+        - name: FruitRushCosmetics
+          file: ./abis/FruitRushCosmetics.json
+      eventHandlers:
+        - event: CosmeticMinted(indexed address,indexed uint256,uint256)
+          handler: handleCosmeticMinted
+        - event: ItemTypeAdded(indexed uint256,uint256,string)
+          handler: handleItemTypeAdded
+        - event: TransferSingle(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleTransferSingle
+        - event: TransferBatch(indexed address,indexed address,indexed address,uint256[],uint256[])
+          handler: handleTransferBatch
+      file: ./src/mappings/cosmetics.ts
+
+  # ─── FruitRushBoast ──────────────────────────────────────────────────────────
+  - kind: ethereum
+    name: FruitRushBoast
+    network: celo
+    source:
+      address: "0xFE1B6115A3FB7b60A184d070DC952E8fA1611097" # REPLACE_ME if redeployed
+      abi: FruitRushBoast
+      startBlock: 72063112  # block boast contract was deployed
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Boast
+      abis:
+        - name: FruitRushBoast
+          file: ./abis/FruitRushBoast.json
+      eventHandlers:
+        - event: BoastMinted(indexed uint256,indexed address,uint256,string,uint256)
+          handler: handleBoastMinted
+      file: ./src/mappings/boast.ts
+
+  # ─── FruitRushTournament (UUPS proxy) ────────────────────────────────────────
+  - kind: ethereum
+    name: FruitRushTournament
+    network: celo
+    source:
+      address: "0x6982756F58380B61755B4Ddf5587c6325dB8f172" # REPLACE_ME if redeployed
+      abi: FruitRushTournament
+      startBlock: 72063302  # block tournament proxy was deployed
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Tournament
+        - TournamentEntry
+        - TournamentPayout
+      abis:
+        - name: FruitRushTournament
+          file: ./abis/FruitRushTournament.json
+      eventHandlers:
+        - event: TournamentCreated(indexed uint256,uint256,uint256,uint256,uint256[])
+          handler: handleTournamentCreated
+        - event: PlayerEntered(indexed uint256,indexed address,uint256)
+          handler: handlePlayerEntered
+        - event: TournamentFinalized(indexed uint256,address[],uint256[],uint256)
+          handler: handleTournamentFinalized
+        - event: TournamentRefunded(indexed uint256,uint256,uint256)
+          handler: handleTournamentRefunded
+      file: ./src/mappings/tournament.ts

@@ -1,0 +1,17 @@
+{
+  "name": "fruit-rush-subgraph",
+  "version": "1.0.0",
+  "description": "Goldsky/The Graph subgraph for Fruit Rush on Celo",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:goldsky": "goldsky subgraph deploy fruit-rush/v1 --path .",
+    "deploy:goldsky:v2": "goldsky subgraph deploy fruit-rush/v2 --path ."
+  },
+  "dependencies": {
+    "@graphprotocol/graph-ts": "^0.32.0"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.71.0"
+  }
+}

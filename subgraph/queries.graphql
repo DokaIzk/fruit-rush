@@ -1,0 +1,148 @@
+# ─────────────────────────────────────────────────────────────────
+# Player's cosmetic inventory (all items where balance > 0)
+# ─────────────────────────────────────────────────────────────────
+query PlayerInventory($player: String!) {
+  cosmeticBalances(
+    where: { owner: $player, balance_gt: "0" }
+    orderBy: lastUpdatedBlock
+    orderDirection: desc
+  ) {
+    balance
+    lastUpdatedBlock
+    item {
+      tokenId
+      category
+      rarity
+      tokenURI
+      maxSupply
+      totalMinted
+    }
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────
+# Player's boast / score attestation history
+# ─────────────────────────────────────────────────────────────────
+query PlayerBoastHistory($player: String!) {
+  boasts(
+    where: { player: $player }
+    orderBy: timestamp
+    orderDirection: desc
+  ) {
+    boastId
+    score
+    gameMode
+    timestamp
+    block
+    txHash
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────
+# Live tournament leaderboard — entries sorted by join order
+# (earliest entrant = position 1)
+# ─────────────────────────────────────────────────────────────────
+query TournamentLeaderboard($tournamentId: String!) {
+  tournament(id: $tournamentId) {
+    tournamentId
+    status
+    entryFee
+    startTime
+    endTime
+    totalPool
+    totalEntrants
+    prizeSharesBps
+    entries(
+      orderBy: entrantIndex
+      orderDirection: asc
+    ) {
+      player
+      entrantIndex
+      enteredAtTimestamp
+      enteredAtTx
+    }
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────
+# Tournament payout history (after finalization)
+# ─────────────────────────────────────────────────────────────────
+query TournamentPayouts($tournamentId: String!) {
+  tournament(id: $tournamentId) {
+    tournamentId
+    status
+    totalPool
+    rake
+    payouts(
+      orderBy: rank
+      orderDirection: asc
+    ) {
+      rank
+      winner
+      amount
+      txHash
+    }
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────
+# All tournaments a player has entered
+# ─────────────────────────────────────────────────────────────────
+query PlayerTournamentHistory($player: String!) {
+  tournamentEntries(
+    where: { player: $player }
+    orderBy: enteredAtTimestamp
+    orderDirection: desc
+  ) {
+    entrantIndex
+    enteredAtTimestamp
+    tournament {
+      tournamentId
+      status
+      entryFee
+      totalPool
+      rake
+      payouts(where: { winner: $player }) {
+        rank
+        amount
+      }
+    }
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────
+# All open tournaments (not yet finalized or refunded)
+# ─────────────────────────────────────────────────────────────────
+query OpenTournaments {
+  tournaments(
+    where: { status: "OPEN" }
+    orderBy: startTime
+    orderDirection: desc
+  ) {
+    tournamentId
+    entryFee
+    startTime
+    endTime
+    totalPool
+    totalEntrants
+    prizeSharesBps
+  }
+}
+
+# ─────────────────────────────────────────────────────────────────
+# Recent cosmetic transfers for a given item
+# ─────────────────────────────────────────────────────────────────
+query ItemTransferHistory($tokenId: String!) {
+  cosmeticTransfers(
+    where: { item: $tokenId }
+    orderBy: block
+    orderDirection: desc
+    first: 50
+  ) {
+    from
+    to
+    amount
+    timestamp
+    txHash
+  }
+}

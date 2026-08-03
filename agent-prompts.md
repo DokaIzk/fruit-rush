@@ -159,7 +159,7 @@ Create a TypeScript module `src/auth/magicAuth.ts` (and supporting files) that:
 **Constraints:**
 - The studio must never custody player private keys — do not extract or log private key material anywhere.
 - If Magic does not natively support gas payment in cUSD (fee abstraction) out of the box, document this gap and stub a `// TODO: integrate paymaster` comment at the relevant call site rather than silently ignoring it.
-- State your assumption on which Magic SDK package and version you are pinning (`@magic-sdk/...`), and note if Privy/Dynamic are worth evaluating as alternatives given the PRD's own caveat about Magic's gas-sponsorship limitations.
+- State your assumption on which Magic SDK packages and versions you are pinning (client-side `magic-sdk` vs. server-side `@magic-sdk/admin`), and note if Privy/Dynamic are worth evaluating as alternatives given the PRD's own caveat about Magic's gas-sponsorship limitations.
 - All secrets (`MAGIC_PUBLISHABLE_KEY`, `CELO_RPC_URL`) must be read from environment variables — never hardcoded.
 
 **Output / Definition of Done:**

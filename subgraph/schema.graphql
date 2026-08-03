@@ -1,0 +1,104 @@
+"""
+FruitRushCosmetics — an ERC-1155 item type registered on-chain.
+Created when ItemTypeAdded is emitted.
+"""
+type CosmeticItem @entity {
+  id: ID!                     # tokenId as hex string
+  tokenId: BigInt!
+  category: Int!              # 1=KnifeSkin 2=FruitSkin 3=Trail 4=Background
+  rarity: Int!                # 1=Common 2=Rare 3=Epic 4=Legendary
+  maxSupply: BigInt!          # 0 = unlimited
+  tokenURI: String!
+  totalMinted: BigInt!        # cumulative mint count
+  createdAtBlock: BigInt!
+  createdAtTx: Bytes!
+  balances: [CosmeticBalance!]! @derivedFrom(field: "item")
+  transfers: [CosmeticTransfer!]! @derivedFrom(field: "item")
+}
+
+"""
+Per-player balance for a cosmetic item. Updated on every transfer.
+"""
+type CosmeticBalance @entity {
+  id: ID!                     # "{tokenId}-{ownerAddress}"
+  item: CosmeticItem!
+  owner: Bytes!               # wallet address
+  balance: BigInt!
+  lastUpdatedBlock: BigInt!
+}
+
+"""
+Individual ERC-1155 transfer record (single or batch expanded).
+"""
+type CosmeticTransfer @entity(immutable: true) {
+  id: ID!                     # "{txHash}-{logIndex}-{index}"
+  item: CosmeticItem!
+  operator: Bytes!
+  from: Bytes!
+  to: Bytes!
+  amount: BigInt!
+  block: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+"""
+On-chain score attestation minted via FruitRushBoast.
+Sufficient data to reconstruct the shareable proof link.
+"""
+type Boast @entity(immutable: true) {
+  id: ID!                     # boastId as decimal string
+  boastId: BigInt!
+  player: Bytes!              # wallet address
+  score: BigInt!
+  gameMode: String!
+  timestamp: BigInt!          # block.timestamp from contract
+  block: BigInt!
+  txHash: Bytes!
+}
+
+"""
+A tournament lifecycle record.
+"""
+type Tournament @entity {
+  id: ID!                     # tournamentId as decimal string
+  tournamentId: BigInt!
+  entryFee: BigInt!           # in cUSD wei
+  startTime: BigInt!
+  endTime: BigInt!
+  prizeSharesBps: [BigInt!]!  # basis points per prize slot
+  status: String!             # OPEN | FINALIZED | REFUNDED
+  totalPool: BigInt!          # sum of all entry fees collected
+  rake: BigInt                # house rake (set on finalization)
+  totalEntrants: BigInt!
+  createdAtBlock: BigInt!
+  createdAtTx: Bytes!
+  entries: [TournamentEntry!]! @derivedFrom(field: "tournament")
+  payouts: [TournamentPayout!]! @derivedFrom(field: "tournament")
+}
+
+"""
+A player's entry into a tournament.
+"""
+type TournamentEntry @entity(immutable: true) {
+  id: ID!                     # "{tournamentId}-{playerAddress}"
+  tournament: Tournament!
+  player: Bytes!
+  entrantIndex: BigInt!       # position in entry order (1-indexed)
+  enteredAtBlock: BigInt!
+  enteredAtTimestamp: BigInt!
+  enteredAtTx: Bytes!
+}
+
+"""
+Payout record for a single winner after tournament finalization.
+"""
+type TournamentPayout @entity(immutable: true) {
+  id: ID!                     # "{tournamentId}-{rank}"
+  tournament: Tournament!
+  rank: Int!                  # 0-indexed (0 = first place)
+  winner: Bytes!
+  amount: BigInt!             # in cUSD wei
+  block: BigInt!
+  txHash: Bytes!
+}
