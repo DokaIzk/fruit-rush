@@ -6,9 +6,9 @@ Goldsky/The Graph subgraph that indexes all on-chain events for the Fruit Rush g
 
 | Contract | Address | Start Block |
 |----------|---------|-------------|
-| `FruitRushCosmetics` (proxy) | `0x054ecDa9539a6ac8cE5F262AD803C477182d35c6` | 72064337 |
-| `FruitRushBoast` | `0xFE1B6115A3FB7b60A184d070DC952E8fA1611097` | 72063112 |
-| `FruitRushTournament` (proxy) | `0x6982756F58380B61755B4Ddf5587c6325dB8f172` | 72063302 |
+| `FruitRushCosmetics` (proxy) | `0x3cE7C794bae69613800b54Df4E43d62d84C4f174` | 73876139 |
+| `FruitRushBoast` | `0xAc9C17Eed06D935C255E5E5c668C5EF07EC79181` | 73876411 |
+| `FruitRushTournament` (proxy) | `0xc396fa8D8fA76457eAD5772a936a896716D2640F` | 73876467 |
 
 ---
 

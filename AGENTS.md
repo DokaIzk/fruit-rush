@@ -75,9 +75,9 @@ Target chain IDs: **42220** (mainnet) / **44787** (Alfajores testnet).
 
 | Contract | Celo Mainnet | Alfajores |
 |----------|-------------|-----------|
-| `FruitRushCosmetics` proxy | `0x054ecDa9539a6ac8cE5F262AD803C477182d35c6` | TBD |
-| `FruitRushBoast` | `0xFE1B6115A3FB7b60A184d070DC952E8fA1611097` | TBD |
-| `FruitRushTournament` proxy | `0x6982756F58380B61755B4Ddf5587c6325dB8f172` | TBD |
+| `FruitRushCosmetics` proxy | `0x3cE7C794bae69613800b54Df4E43d62d84C4f174` | TBD |
+| `FruitRushBoast` | `0xAc9C17Eed06D935C255E5E5c668C5EF07EC79181` | TBD |
+| `FruitRushTournament` proxy | `0xc396fa8D8fA76457eAD5772a936a896716D2640F` | TBD |
 | cUSD | `0x765DE816845861e75A25fCA122bb6898B8B1282a` | `0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1` |
 
 ---

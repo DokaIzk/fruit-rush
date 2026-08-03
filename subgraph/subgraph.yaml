@@ -11,9 +11,9 @@ dataSources:
     name: FruitRushCosmetics
     network: celo
     source:
-      address: "0x054ecDa9539a6ac8cE5F262AD803C477182d35c6" # REPLACE_ME if redeployed
+      address: "0x3cE7C794bae69613800b54Df4E43d62d84C4f174"
       abi: FruitRushCosmetics
-      startBlock: 72064337  # block cosmetics proxy was deployed
+      startBlock: 73876139  # block cosmetics proxy was redeployed
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -41,9 +41,9 @@ dataSources:
     name: FruitRushBoast
     network: celo
     source:
-      address: "0xFE1B6115A3FB7b60A184d070DC952E8fA1611097" # REPLACE_ME if redeployed
+      address: "0xAc9C17Eed06D935C255E5E5c668C5EF07EC79181"
       abi: FruitRushBoast
-      startBlock: 72063112  # block boast contract was deployed
+      startBlock: 73876411  # block boast contract was redeployed
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -63,9 +63,9 @@ dataSources:
     name: FruitRushTournament
     network: celo
     source:
-      address: "0x6982756F58380B61755B4Ddf5587c6325dB8f172" # REPLACE_ME if redeployed
+      address: "0xc396fa8D8fA76457eAD5772a936a896716D2640F"
       abi: FruitRushTournament
-      startBlock: 72063302  # block tournament proxy was deployed
+      startBlock: 73876467  # block tournament proxy was redeployed
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
