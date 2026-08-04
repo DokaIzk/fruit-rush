@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Backend API Service
+  # ============================================================================
+  backend:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - MAGIC_SECRET_KEY=${MAGIC_SECRET_KEY}
+      - BOAST_SIGNER_PRIVATE_KEY=${BOAST_SIGNER_PRIVATE_KEY}
+      - GOLDSKY_SUBGRAPH_URL=${GOLDSKY_SUBGRAPH_URL}
+      - SCORE_TOLERANCE_PCT=2.0
+      - SESSION_RATE_LIMIT=10
+      - CORS_ORIGINS=*
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - fruit-rush
+
+  # ============================================================================
+  # Redis (Rate Limiting & Caching)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - fruit-rush
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # PostgreSQL (Local Development Only)
+  # ============================================================================
+  # Uncomment for local dev without Supabase
+  # postgres:
+  #   image: postgres:15-alpine
+  #   ports:
+  #     - '5432:5432'
+  #   environment:
+  #     - POSTGRES_DB=fruit_rush
+  #     - POSTGRES_USER=fruit_rush
+  #     - POSTGRES_PASSWORD=fruit_rush_dev_password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ../db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+  #   restart: unless-stopped
+  #   networks:
+  #     - fruit-rush
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U fruit_rush']
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  fruit-rush:
+    driver: bridge
+
+volumes:
+  redis_data:
+  # postgres_data:  # Uncomment if using local postgres

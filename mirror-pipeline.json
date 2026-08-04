@@ -1,0 +1,174 @@
+{
+  "version": "1.0",
+  "name": "fruit-rush-analytics",
+  "description": "Real-time streaming of Fruit Rush on-chain events into Postgres for BI, fraud detection, and finance reconciliation",
+  
+  "chains": {
+    "celo-mainnet": {
+      "chainId": 42220,
+      "rpcUrl": "${CELO_RPC_URL}",
+      "contracts": {
+        "FruitRushCosmetics": {
+          "address": "REPLACE_ME_WITH_COSMETICS_PROXY_ADDRESS",
+          "abi": "./abis/FruitRushCosmetics.json",
+          "startBlock": "REPLACE_ME_WITH_DEPLOYMENT_BLOCK",
+          "events": [
+            "CosmeticMinted(address indexed to, uint256 indexed tokenId, uint256 amount)"
+          ]
+        },
+        "FruitRushBoast": {
+          "address": "REPLACE_ME_WITH_BOAST_ADDRESS",
+          "abi": "./abis/FruitRushBoast.json",
+          "startBlock": "REPLACE_ME_WITH_DEPLOYMENT_BLOCK",
+          "events": [
+            "BoastMinted(uint256 indexed boastId, address indexed player, uint256 score, string gameMode, uint256 timestamp)"
+          ]
+        },
+        "FruitRushTournament": {
+          "address": "REPLACE_ME_WITH_TOURNAMENT_PROXY_ADDRESS",
+          "abi": "./abis/FruitRushTournament.json",
+          "startBlock": "REPLACE_ME_WITH_DEPLOYMENT_BLOCK",
+          "events": [
+            "PlayerEntered(uint256 indexed tournamentId, address indexed player, uint256 totalEntrants)",
+            "TournamentFinalized(uint256 indexed tournamentId, address[] winners, uint256[] payouts, uint256 rake)",
+            "TournamentRefunded(uint256 indexed tournamentId, uint256 totalRefunded, uint256 entrantCount)"
+          ]
+        }
+      }
+    }
+  },
+
+  "sinks": {
+    "postgres": {
+      "type": "postgres",
+      "connectionString": "${DATABASE_URL}",
+      "schema": "fruit_rush",
+      "batchSize": 100,
+      "flushIntervalMs": 1000,
+      "reorgHandling": {
+        "enabled": true,
+        "maxDepth": 64,
+        "strategy": "delete-and-reinsert"
+      }
+    }
+  },
+
+  "streams": [
+    {
+      "id": "cosmetic_mints",
+      "source": {
+        "chain": "celo-mainnet",
+        "contract": "FruitRushCosmetics",
+        "event": "CosmeticMinted"
+      },
+      "sink": {
+        "target": "postgres",
+        "table": "cosmetic_mints",
+        "mapping": {
+          "player_address": "event.to",
+          "token_id": "event.tokenId",
+          "amount": "event.amount",
+          "block_number": "block.number",
+          "block_timestamp": "block.timestamp",
+          "transaction_hash": "transaction.hash",
+          "log_index": "log.index"
+        }
+      }
+    },
+    {
+      "id": "boast_mints",
+      "source": {
+        "chain": "celo-mainnet",
+        "contract": "FruitRushBoast",
+        "event": "BoastMinted"
+      },
+      "sink": {
+        "target": "postgres",
+        "table": "boast_mints",
+        "mapping": {
+          "boast_id": "event.boastId",
+          "player_address": "event.player",
+          "score": "event.score",
+          "game_mode": "event.gameMode",
+          "event_timestamp": "event.timestamp",
+          "block_number": "block.number",
+          "block_timestamp": "block.timestamp",
+          "transaction_hash": "transaction.hash",
+          "log_index": "log.index"
+        }
+      }
+    },
+    {
+      "id": "tournament_entries",
+      "source": {
+        "chain": "celo-mainnet",
+        "contract": "FruitRushTournament",
+        "event": "PlayerEntered"
+      },
+      "sink": {
+        "target": "postgres",
+        "table": "tournament_entries",
+        "mapping": {
+          "tournament_id": "event.tournamentId",
+          "player_address": "event.player",
+          "total_entrants": "event.totalEntrants",
+          "block_number": "block.number",
+          "block_timestamp": "block.timestamp",
+          "transaction_hash": "transaction.hash",
+          "log_index": "log.index"
+        }
+      }
+    },
+    {
+      "id": "tournament_payouts",
+      "source": {
+        "chain": "celo-mainnet",
+        "contract": "FruitRushTournament",
+        "event": "TournamentFinalized"
+      },
+      "sink": {
+        "target": "postgres",
+        "table": "tournament_payouts",
+        "mapping": {
+          "tournament_id": "event.tournamentId",
+          "winners": "event.winners",
+          "payouts": "event.payouts",
+          "rake": "event.rake",
+          "block_number": "block.number",
+          "block_timestamp": "block.timestamp",
+          "transaction_hash": "transaction.hash",
+          "log_index": "log.index"
+        }
+      }
+    },
+    {
+      "id": "tournament_refunds",
+      "source": {
+        "chain": "celo-mainnet",
+        "contract": "FruitRushTournament",
+        "event": "TournamentRefunded"
+      },
+      "sink": {
+        "target": "postgres",
+        "table": "tournament_refunds",
+        "mapping": {
+          "tournament_id": "event.tournamentId",
+          "total_refunded": "event.totalRefunded",
+          "entrant_count": "event.entrantCount",
+          "block_number": "block.number",
+          "block_timestamp": "block.timestamp",
+          "transaction_hash": "transaction.hash",
+          "log_index": "log.index"
+        }
+      }
+    }
+  ],
+
+  "monitoring": {
+    "enabled": true,
+    "alerting": {
+      "lagThresholdSeconds": 300,
+      "errorThreshold": 10
+    }
+  }
+}

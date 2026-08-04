@@ -1,0 +1,706 @@
+openapi: 3.0.3
+info:
+  title: Fruit Rush Backend API
+  description: |
+    Session validation and score verification microservice for Fruit Rush.
+    
+    **Server-authoritative scoring:** All game sessions are replay-validated 
+    using the player's input event log. Client-reported scores are untrusted.
+    
+    **Authentication:** All endpoints (except /health and /leaderboard) require 
+    Magic.link JWT token in `Authorization: Bearer <token>` header.
+    
+    **Rate Limiting:** 
+    - Session validation: 10 requests/player/hour
+    - Boast signing: 5 requests/player/hour
+    - Leaderboard: 60 requests/IP/minute
+  version: 1.0.0
+  contact:
+    name: Fruit Rush Team
+    email: backend@fruitrush.game
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://api.fruitrush.game
+    description: Production
+
+security:
+  - BearerAuth: []
+
+paths:
+  /session/validate:
+    post:
+      summary: Validate game session
+      description: |
+        Validate a game session via replay simulation. The server re-computes 
+        the score from the input event log and rejects sessions with >2% divergence.
+      operationId: validateSession
+      tags:
+        - Session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameSessionResult'
+      responses:
+        '200':
+          description: Session validated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /boast/sign:
+    post:
+      summary: Sign boast attestation
+      description: |
+        Generate ECDSA signature for on-chain boast minting. Only valid sessions 
+        can be signed. The signature can then be submitted to the FruitRushBoast 
+        smart contract.
+      operationId: signBoast
+      tags:
+        - Boast
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                  example: '550e8400-e29b-41d4-a716-446655440000'
+      responses:
+        '200':
+          description: Signature generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoastSignatureResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Session not found
+        '409':
+          description: Boast already signed for this session
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /leaderboard/{gameMode}:
+    get:
+      summary: Get leaderboard
+      description: |
+        Get top 100 scores for a game mode with on-chain boast status. 
+        Results are cached for 5 minutes.
+      operationId: getLeaderboard
+      tags:
+        - Leaderboard
+      security: []  # No auth required
+      parameters:
+        - name: gameMode
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/GameMode'
+      responses:
+        '200':
+          description: Leaderboard retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gameMode:
+                    $ref: '#/components/schemas/GameMode'
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LeaderboardEntry'
+                  total:
+                    type: integer
+                    example: 100
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /tournament/{id}/enter:
+    post:
+      summary: Check tournament eligibility
+      description: |
+        Check if player is eligible to enter a tournament. Records entry intent 
+        if eligible. Actual on-chain entry happens client-side after this returns.
+      operationId: enterTournament
+      tags:
+        - Tournament
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^\d+$'
+          example: '1'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - playerAddress
+              properties:
+                playerAddress:
+                  type: string
+                  pattern: '^0x[a-fA-F0-9]{40}$'
+                  example: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+      responses:
+        '200':
+          description: Eligibility checked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TournamentEligibilityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /health:
+    get:
+      summary: Health check
+      description: Check service health and dependency connectivity
+      operationId: healthCheck
+      tags:
+        - Health
+      security: []  # No auth required
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: integer
+                    description: Uptime in seconds
+                  supabase:
+                    type: string
+                    enum: [connected, error]
+                  redis:
+                    type: string
+                    enum: [connected, error]
+        '503':
+          description: Service degraded
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Magic.link JWT token
+
+  schemas:
+    GameMode:
+      type: string
+      enum: [Classic, Zen, Arcade, Tournament]
+      example: Classic
+
+    InputEvent:
+      type: object
+      required: [t, x, y, velocity]
+      properties:
+        t:
+          type: number
+          description: Milliseconds offset from session start
+          minimum: 0
+          example: 1250
+        x:
+          type: number
+          description: Normalized X coordinate (0-1)
+          minimum: 0
+          maximum: 1
+          example: 0.42
+        y:
+          type: number
+          description: Normalized Y coordinate (0-1)
+          minimum: 0
+          maximum: 1
+          example: 0.68
+        velocity:
+          type: number
+          description: Swipe velocity in pixels per millisecond
+          minimum: 0
+          example: 1.2
+
+    GameSessionResult:
+      type: object
+      required:
+        - playerId
+        - score
+        - gameMode
+        - comboHighwater
+        - durationSeconds
+        - clientTimestamp
+        - inputEventLog
+      properties:
+        playerId:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+          description: Player's Celo wallet address
+          example: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+        score:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          example: 12450
+        gameMode:
+          $ref: '#/components/schemas/GameMode'
+        comboHighwater:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Highest combo achieved
+          example: 28
+        durationSeconds:
+          type: number
+          minimum: 0
+          maximum: 600
+          description: Session duration in seconds
+          example: 180
+        clientTimestamp:
+          type: integer
+          description: Unix timestamp in milliseconds
+          example: 1704067200000
+        inputEventLog:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            $ref: '#/components/schemas/InputEvent'
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          example: true
+        serverScore:
+          type: integer
+          example: 12480
+        sessionId:
+          type: string
+          format: uuid
+          example: '550e8400-e29b-41d4-a716-446655440000'
+        scoreDivergence:
+          type: number
+          description: Percentage difference between client and server score
+          example: 0.24
+        rejectionReason:
+          type: string
+          description: Present only if valid=false
+          example: 'Score divergence 3.5% exceeds 2.0% tolerance'
+
+    BoastSignatureResponse:
+      type: object
+      properties:
+        signature:
+          type: string
+          description: ECDSA signature (65 bytes hex-encoded)
+          example: '0x1234567890abcdef...'
+        playerAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+          example: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+        score:
+          type: integer
+          example: 12480
+        gameMode:
+          type: string
+          example: Classic
+        nonce:
+          type: integer
+          description: Nonce for replay protection
+          example: 42
+        signerAddress:
+          type: string
+          description: Trusted signer address (for verification)
+          example: '0x9876543210fedcba...'
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        playerAddress:
+          type: string
+          example: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+        score:
+          type: integer
+          example: 125000
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-08-03T18:30:00.000Z'
+        hasBoast:
+          type: boolean
+          description: Whether an on-chain boast exists
+          example: true
+        gameMode:
+          $ref: '#/components/schemas/GameMode'
+        comboHighwater:
+          type: integer
+          example: 85
+
+    TournamentEligibilityResponse:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+          example: true
+        tournamentId:
+          type: string
+          example: '1'
+        reason:
+          type: string
+          description: Present only if eligible=false
+          example: 'Player already entered this tournament'
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Validation error
+              details:
+                type: array
+                items:
+                  type: object
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+              message:
+                type: string
+                example: Invalid or expired token
+
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Forbidden
+              message:
+                type: string
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Rate limit exceeded
+              message:
+                type: string
+                example: 'Maximum 10 requests per 3600 seconds'
+              retryAfter:
+                type: integer
+                description: Seconds until rate limit resets
+                example: 3600
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+
+tags:
+  - name: Session
+    description: Game session validation
+  - name: Boast
+    description: On-chain score attestation signing
+  - name: Leaderboard
+    description: Leaderboard queries
+  - name: Tournament
+    description: Tournament entry management
+  - name: Health
+    description: Service health checks
+
+  /tournament/active:
+    get:
+      summary: List active tournaments
+      description: |
+        Get all currently open tournaments with entry details, prize pools, 
+        and player entry status.
+      operationId: getActiveTournaments
+      tags:
+        - Tournament
+      security: []
+      parameters:
+        - name: playerAddress
+          in: query
+          description: Player address to check entry status
+          required: false
+          schema:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
+      responses:
+        '200':
+          description: Active tournaments list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tournaments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActiveTournamentInfo'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tournament/{id}/leaderboard:
+    get:
+      summary: Get tournament leaderboard
+      description: |
+        Get live rankings for a tournament (cached for 10 seconds).
+        Shows top 100 players with scores and prize amounts.
+      operationId: getTournamentLeaderboard
+      tags:
+        - Tournament
+      security: []
+      parameters:
+        - name: id
+          in: path
+          description: Tournament ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tournament leaderboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tournamentId:
+                    type: string
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TournamentLeaderboardEntry'
+        '404':
+          description: Tournament not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tournament/{id}/refund:
+    post:
+      summary: Refund tournament (admin-only)
+      description: |
+        Emergency refund for a tournament. Cancels the tournament and returns 
+        entry fees to all players on-chain.
+        
+        **Requires admin key** in request body.
+      operationId: refundTournament
+      tags:
+        - Tournament
+      security: []
+      parameters:
+        - name: id
+          in: path
+          description: Tournament ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - adminKey
+              properties:
+                adminKey:
+                  type: string
+                  description: Admin authorization key
+      responses:
+        '200':
+          description: Tournament refunded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  transactionHash:
+                    type: string
+                    example: '0xabc123...'
+                  message:
+                    type: string
+        '400':
+          description: Cannot refund (already finalized/refunded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Unauthorized (invalid admin key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tournament not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Refund failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    ActiveTournamentInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Tournament ID
+        entryFee:
+          type: string
+          description: Entry fee in cUSD (human-readable)
+          example: '5.0'
+        prizePool:
+          type: string
+          description: Total prize pool in cUSD
+          example: '500.0'
+        entryCount:
+          type: integer
+          description: Number of entries
+          example: 100
+        startTime:
+          type: integer
+          description: Unix timestamp
+          example: 1704067200
+        endTime:
+          type: integer
+          description: Unix timestamp
+          example: 1704153600
+        timeRemaining:
+          type: integer
+          description: Seconds until end
+          example: 3600
+        playerEntered:
+          type: boolean
+          description: Whether the querying player has entered
+          example: false
+        status:
+          type: string
+          enum: [Pending, Open, Closed, Finalized, Refunded]
+        prizeDistribution:
+          type: array
+          items:
+            type: object
+            properties:
+              place:
+                type: integer
+                example: 1
+              share:
+                type: string
+                example: '50.0%'
+              amount:
+                type: string
+                example: '250.0'
+
+    TournamentLeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+          example: 1
+        playerAddress:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+          example: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
+        score:
+          type: integer
+          example: 125000
+        comboHighwater:
+          type: integer
+          example: 85
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-08-03T18:30:00.000Z'
+        prize:
+          type: string
+          description: Prize amount in cUSD (only for top positions)
+          example: '250.0'
