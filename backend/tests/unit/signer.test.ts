@@ -12,7 +12,7 @@ jest.mock('../../src/services/redis', () => ({
 }));
 
 describe('Boast Signer', () => {
-  const testPlayerAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb';
+  const testPlayerAddress = '0x0000000000000000000000000000000000000001';
   const testScore = 12450;
   const testGameMode = 'Classic';
 
@@ -81,7 +81,7 @@ describe('Boast Signer', () => {
       const { signature, nonce } = await signBoast(testPlayerAddress, testScore, testGameMode);
 
       const isValid = verifyBoastSignature(
-        '0x0000000000000000000000000000000000000001',
+        '0x0000000000000000000000000000000000000002',
         testScore,
         testGameMode,
         nonce,

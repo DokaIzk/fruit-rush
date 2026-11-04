@@ -6,7 +6,6 @@
 
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ethers } from 'ethers';
-
 // Mock ethers.js
 jest.mock('ethers');
 
@@ -81,21 +80,20 @@ describe('Tournament Scheduler', () => {
 
   describe('Prize Pool Calculation', () => {
     it('should calculate payouts correctly', () => {
-      const entryFee = ethers.parseUnits('5', 18); // 5 cUSD
-      const entrants = 100;
-      const prizeSharesBps = [5000, 2500, 1000]; // 50%, 25%, 10%
+      const entryFee = BigInt("5000000000000000000"); // 5 cUSD
+      const entrants = 100n;
 
-      const totalPool = entryFee * BigInt(entrants); // 500 cUSD
+      const totalPool = entryFee * entrants; // 500 cUSD
       const payout1 = (totalPool * BigInt(5000)) / BigInt(10000); // 250 cUSD
       const payout2 = (totalPool * BigInt(2500)) / BigInt(10000); // 125 cUSD
       const payout3 = (totalPool * BigInt(1000)) / BigInt(10000); // 50 cUSD
 
-      expect(payout1).toBe(ethers.parseUnits('250', 18));
-      expect(payout2).toBe(ethers.parseUnits('125', 18));
-      expect(payout3).toBe(ethers.parseUnits('50', 18));
+      expect(payout1).toBe(BigInt("250000000000000000000"));
+      expect(payout2).toBe(BigInt("125000000000000000000"));
+      expect(payout3).toBe(BigInt("50000000000000000000"));
 
       const rake = totalPool - payout1 - payout2 - payout3;
-      expect(rake).toBe(ethers.parseUnits('75', 18)); // 15%
+      expect(rake).toBe(BigInt("75000000000000000000")); // 15%
     });
 
     it('should ensure rake is at least 15%', () => {

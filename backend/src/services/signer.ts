@@ -4,7 +4,7 @@
  * ECDSA signature generation for on-chain boast attestations.
  */
 
-import { Wallet, keccak256, solidityPacked, getBytes, hexlify } from 'ethers';
+import { Wallet, keccak256, solidityPacked, getBytes, verifyMessage } from 'ethers';
 import { BOAST_SIGNER_PRIVATE_KEY } from '../config';
 import { getNextBoastNonce } from './redis';
 
@@ -78,7 +78,7 @@ export function verifyBoastSignature(
       )
     );
 
-    const recoveredAddress = Wallet.verifyMessage(getBytes(messageHash), signature);
+    const recoveredAddress = verifyMessage(getBytes(messageHash), signature);
     return recoveredAddress.toLowerCase() === signerWallet.address.toLowerCase();
   } catch (error) {
     return false;

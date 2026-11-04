@@ -22,7 +22,7 @@ const startTime = Date.now();
  */
 router.get(
   '/',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (_req, res) => {
     const health: any = {
       status: 'healthy',
       timestamp: new Date().toISOString(),

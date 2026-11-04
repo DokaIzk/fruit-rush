@@ -8,7 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { PORT, NODE_ENV, CORS_ORIGINS, LOG_LEVEL } from './config';
+import { PORT, NODE_ENV, CORS_ORIGINS } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 // Import routes
@@ -65,7 +65,7 @@ app.use('/tournament', tournamentAdminRoutes); // Admin endpoints (active, leade
 app.use('/health', healthRoutes);
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     service: 'Fruit Rush Backend',
     version: '1.0.0',

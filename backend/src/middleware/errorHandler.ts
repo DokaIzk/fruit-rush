@@ -13,9 +13,9 @@ import { ZodError } from 'zod';
  */
 export function errorHandler(
   err: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void {
   console.error('Error:', err);
 
@@ -75,10 +75,10 @@ export function errorHandler(
 /**
  * 404 handler for unknown routes.
  */
-export function notFoundHandler(req: Request, res: Response): void {
+export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({
     error: 'Not found',
-    message: `Route ${req.method} ${req.path} not found`,
+    message: `Route ${_req.method} ${_req.path} not found`,
   });
 }
 

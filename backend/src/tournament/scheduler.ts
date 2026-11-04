@@ -16,7 +16,7 @@ import {
   finalizeTournamentOnChain,
   getOperatorAddress,
 } from './contractService';
-import { validatePrizeShares, calculatePrizePool } from './validation';
+import { validatePrizeShares } from './validation';
 import { TournamentTemplate, FinalizationResult } from './types';
 import { TOURNAMENT_FAILURE_WEBHOOK_URL, NODE_ENV } from '../config';
 import { ethers } from 'ethers';
@@ -108,22 +108,56 @@ async function getTournamentLeaderboard(
   tournamentId: string,
   limit: number
 ): Promise<string[]> {
+  const { data: tournament, error: tournamentError } = await supabase
+    .from('tournaments')
+    .select('start_time, end_time')
+    .eq('tournament_id', tournamentId)
+    .single();
+
+  if (tournamentError || !tournament) {
+    throw tournamentError ?? new Error(`Tournament ${tournamentId} not found`);
+  }
+
+  const { data: entries, error: entriesError } = await supabase
+    .from('tournament_entries')
+    .select('player_address')
+    .eq('tournament_id', tournamentId);
+
+  if (entriesError) {
+    console.error(`[Scheduler] Failed to fetch entries for tournament ${tournamentId}:`, entriesError);
+    throw entriesError;
+  }
+
+  const entrantAddresses = (entries ?? []).map(row => row.player_address);
+  if (entrantAddresses.length === 0) return [];
+
   const { data, error } = await supabase
     .from('game_sessions')
     .select('player_id, server_score')
     .eq('valid', true)
     .eq('game_mode', 'Tournament')
-    .gte('server_timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+    .in('player_id', entrantAddresses)
+    .gte('server_timestamp', tournament.start_time)
+    .lte('server_timestamp', tournament.end_time)
     .order('server_score', { ascending: false })
-    .limit(limit);
+    .limit(Math.max(limit * 20, 100));
 
   if (error) {
     console.error(`[Scheduler] Failed to fetch leaderboard for tournament ${tournamentId}:`, error);
     throw error;
   }
 
-  // Return ranked player addresses
-  return data.map(row => row.player_id);
+  const rankedWinners: string[] = [];
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const player = row.player_id.toLowerCase();
+    if (!seen.has(player)) {
+      seen.add(player);
+      rankedWinners.push(row.player_id);
+      if (rankedWinners.length === limit) break;
+    }
+  }
+  return rankedWinners;
 }
 
 /**

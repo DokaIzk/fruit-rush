@@ -48,8 +48,8 @@ export async function authMiddleware(
     // Get user metadata from token
     const metadata = await magic.users.getMetadataByToken(token);
 
-    if (!metadata.publicAddress) {
-      res.status(401).json({ error: 'Invalid token: no public address' });
+    if (!metadata.publicAddress || !metadata.issuer) {
+      res.status(401).json({ error: 'Invalid token: missing user identity' });
       return;
     }
 

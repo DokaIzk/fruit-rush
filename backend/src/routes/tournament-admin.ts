@@ -7,11 +7,10 @@
  */
 
 import express from 'express';
-import { authMiddleware, requirePlayerMatch } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { redis } from '../services/redis';
 import { supabase } from '../services/supabase';
-import { refundTournamentOnChain, getTournamentFromChain } from '../tournament/contractService';
+import { refundTournamentOnChain } from '../tournament/contractService';
 import { calculatePrizePool } from '../tournament/validation';
 import { ActiveTournamentInfo, TournamentLeaderboardEntry } from '../tournament/types';
 import { ethers } from 'ethers';
@@ -129,7 +128,7 @@ router.get(
     // Fetch tournament to get prize share count
     const { data: tournament, error: tournamentError } = await supabase
       .from('tournaments')
-      .select('prize_shares_bps, entry_fee_wei')
+      .select('prize_shares_bps, entry_fee_wei, start_time, end_time')
       .eq('tournament_id', tournamentId)
       .single();
 
@@ -138,18 +137,44 @@ router.get(
       return;
     }
 
-    // Fetch leaderboard (only valid sessions)
-    const { data, error } = await supabase
-      .from('game_sessions')
-      .select('player_id, server_score, combo_highwater, server_timestamp')
-      .eq('valid', true)
-      .eq('game_mode', 'Tournament')
-      .order('server_score', { ascending: false })
-      .limit(100);
+    const { data: entrants, error: entrantsError } = await supabase
+      .from('tournament_entries')
+      .select('player_address')
+      .eq('tournament_id', tournamentId);
+
+    if (entrantsError) {
+      res.status(500).json({ error: 'Failed to fetch tournament entrants', message: entrantsError.message });
+      return;
+    }
+
+    const entrantAddresses = (entrants ?? []).map(row => row.player_address);
+    const { data: sessionRows, error } = entrantAddresses.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .from('game_sessions')
+          .select('player_id, server_score, combo_highwater, server_timestamp')
+          .eq('valid', true)
+          .eq('game_mode', 'Tournament')
+          .in('player_id', entrantAddresses)
+          .gte('server_timestamp', tournament.start_time)
+          .lte('server_timestamp', tournament.end_time)
+          .order('server_score', { ascending: false })
+          .limit(2000);
 
     if (error) {
       res.status(500).json({ error: 'Failed to fetch leaderboard', message: error.message });
       return;
+    }
+
+    const data = [];
+    const seen = new Set<string>();
+    for (const row of sessionRows ?? []) {
+      const player = row.player_id.toLowerCase();
+      if (!seen.has(player)) {
+        seen.add(player);
+        data.push(row);
+        if (data.length === 100) break;
+      }
     }
 
     // Calculate prize amounts

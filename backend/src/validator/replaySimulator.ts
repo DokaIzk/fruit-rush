@@ -146,7 +146,7 @@ interface SimulationState {
 export function replaySimulation(
   inputEventLog: InputEvent[],
   clientScore: number,
-  gameMode: GameMode,
+  _gameMode: GameMode,
   durationSeconds: number
 ): {
   serverScore: number;
@@ -183,12 +183,12 @@ export function replaySimulation(
   for (let t = 0; t <= durationMs; t += SIMULATION_TIMESTEP_MS) {
     // Spawn fruits
     while (t >= state.nextSpawnTime && t < durationMs) {
-      spawnFruit(state, t, gameMode);
+      spawnFruit(state, t);
       state.nextSpawnTime = randomSpawnTime(t);
     }
 
     // Update fruit physics
-    updateFruits(state, t);
+    updateFruits(state);
 
     // Process input events at this timestep
     while (inputIndex < inputEvents.length && inputEvents[inputIndex].t <= t) {
@@ -272,7 +272,7 @@ function validateInputLog(
 /**
  * Spawn a new fruit with random initial conditions.
  */
-function spawnFruit(state: SimulationState, t: number, gameMode: GameMode) {
+function spawnFruit(state: SimulationState, t: number) {
   const fruit: Fruit = {
     id: state.nextFruitId++,
     x: Math.random(), // Random X position [0, 1]
@@ -292,7 +292,7 @@ function spawnFruit(state: SimulationState, t: number, gameMode: GameMode) {
 /**
  * Update fruit positions using simple Euler integration.
  */
-function updateFruits(state: SimulationState, t: number) {
+function updateFruits(state: SimulationState) {
   for (const fruit of state.fruits) {
     if (!fruit.active) continue;
 

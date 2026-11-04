@@ -29,24 +29,24 @@ contract FruitRushTournamentTest is Test {
     MockERC20 cusd;
 
     // ─── Actors ───────────────────────────────────────────────────────────────
-    address admin     = makeAddr("admin");
-    address operator  = makeAddr("operator");
+    address admin = makeAddr("admin");
+    address operator = makeAddr("operator");
     address finalizer = makeAddr("finalizer");
-    address treasury  = makeAddr("treasury");
-    address player1   = makeAddr("player1");
-    address player2   = makeAddr("player2");
-    address player3   = makeAddr("player3");
-    address stranger  = makeAddr("stranger");
+    address treasury = makeAddr("treasury");
+    address player1 = makeAddr("player1");
+    address player2 = makeAddr("player2");
+    address player3 = makeAddr("player3");
+    address stranger = makeAddr("stranger");
 
     // ─── System under test ────────────────────────────────────────────────────
     FruitRushTournament impl;
     FruitRushTournament tournament; // proxy
 
     // ─── Default tournament params ────────────────────────────────────────────
-    uint256 constant T_ID       = 1;
-    uint256 constant ENTRY_FEE  = 5e18;      // $5 cUSD
+    uint256 constant T_ID = 1;
+    uint256 constant ENTRY_FEE = 5e18; // $5 cUSD
     uint256 constant START_TIME = 1_000;
-    uint256 constant END_TIME   = 2_000;
+    uint256 constant END_TIME = 2_000;
     // prize split: 50% / 25% / 10% → rake 15%
     uint256[] prizeBps;
 
@@ -64,10 +64,8 @@ contract FruitRushTournamentTest is Test {
 
         // Deploy impl + proxy
         impl = new FruitRushTournament();
-        bytes memory initData = abi.encodeCall(
-            FruitRushTournament.initialize,
-            (address(cusd), admin, operator, finalizer, treasury)
-        );
+        bytes memory initData =
+            abi.encodeCall(FruitRushTournament.initialize, (address(cusd), admin, operator, finalizer, treasury));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         tournament = FruitRushTournament(address(proxy));
 
@@ -75,9 +73,12 @@ contract FruitRushTournamentTest is Test {
         cusd.mint(player1, 100e18);
         cusd.mint(player2, 100e18);
         cusd.mint(player3, 100e18);
-        vm.prank(player1); cusd.approve(address(tournament), type(uint256).max);
-        vm.prank(player2); cusd.approve(address(tournament), type(uint256).max);
-        vm.prank(player3); cusd.approve(address(tournament), type(uint256).max);
+        vm.prank(player1);
+        cusd.approve(address(tournament), type(uint256).max);
+        vm.prank(player2);
+        cusd.approve(address(tournament), type(uint256).max);
+        vm.prank(player3);
+        cusd.approve(address(tournament), type(uint256).max);
 
         // Warp to before start
         vm.warp(500);
@@ -102,9 +103,9 @@ contract FruitRushTournamentTest is Test {
 
     function test_init_rolesGranted() public view {
         assertTrue(tournament.hasRole(tournament.DEFAULT_ADMIN_ROLE(), admin));
-        assertTrue(tournament.hasRole(tournament.OPERATOR_ROLE(),  operator));
+        assertTrue(tournament.hasRole(tournament.OPERATOR_ROLE(), operator));
         assertTrue(tournament.hasRole(tournament.FINALIZER_ROLE(), finalizer));
-        assertTrue(tournament.hasRole(tournament.UPGRADER_ROLE(),  admin));
+        assertTrue(tournament.hasRole(tournament.UPGRADER_ROLE(), admin));
     }
 
     function test_init_cusdSet() public view {
@@ -117,10 +118,8 @@ contract FruitRushTournamentTest is Test {
 
     function test_init_zeroAddressReverts() public {
         FruitRushTournament freshImpl = new FruitRushTournament();
-        bytes memory bad = abi.encodeCall(
-            FruitRushTournament.initialize,
-            (address(0), admin, operator, finalizer, treasury)
-        );
+        bytes memory bad =
+            abi.encodeCall(FruitRushTournament.initialize, (address(0), admin, operator, finalizer, treasury));
         vm.expectRevert(FruitRushTournament.ZeroAddress.selector);
         new ERC1967Proxy(address(freshImpl), bad);
     }
@@ -136,8 +135,7 @@ contract FruitRushTournamentTest is Test {
 
     function test_create_succeeds() public {
         _createDefault();
-        (uint256 fee,,,,, FruitRushTournament.TournamentStatus status,) =
-            tournament.getTournament(T_ID);
+        (uint256 fee,,,,, FruitRushTournament.TournamentStatus status,) = tournament.getTournament(T_ID);
         assertEq(fee, ENTRY_FEE);
         assertEq(uint8(status), uint8(FruitRushTournament.TournamentStatus.Pending));
     }
@@ -152,19 +150,13 @@ contract FruitRushTournamentTest is Test {
     function test_create_duplicateIdReverts() public {
         _createDefault();
         vm.prank(operator);
-        vm.expectRevert(
-            abi.encodeWithSelector(FruitRushTournament.TournamentAlreadyExists.selector, T_ID)
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.TournamentAlreadyExists.selector, T_ID));
         tournament.createTournament(T_ID, ENTRY_FEE, START_TIME, END_TIME, prizeBps);
     }
 
     function test_create_invalidTimeRangeReverts() public {
         vm.prank(operator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FruitRushTournament.InvalidTimeRange.selector, END_TIME, START_TIME
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.InvalidTimeRange.selector, END_TIME, START_TIME));
         tournament.createTournament(T_ID, ENTRY_FEE, END_TIME, START_TIME, prizeBps);
     }
 
@@ -185,11 +177,7 @@ contract FruitRushTournamentTest is Test {
         uint256[] memory greedy = new uint256[](1);
         greedy[0] = 8_501; // > 8500 bps
         vm.prank(operator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FruitRushTournament.InvalidPrizeShares.selector, 8_501, 8_500
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.InvalidPrizeShares.selector, 8_501, 8_500));
         tournament.createTournament(T_ID, ENTRY_FEE, START_TIME, END_TIME, greedy);
     }
 
@@ -235,7 +223,7 @@ contract FruitRushTournamentTest is Test {
     function test_enter_statusBecomesOpen() public {
         _createDefault();
         _enterAt(player1, START_TIME + 1);
-        (,,,,,FruitRushTournament.TournamentStatus status,) = tournament.getTournament(T_ID);
+        (,,,,, FruitRushTournament.TournamentStatus status,) = tournament.getTournament(T_ID);
         assertEq(uint8(status), uint8(FruitRushTournament.TournamentStatus.Open));
     }
 
@@ -246,7 +234,7 @@ contract FruitRushTournamentTest is Test {
         _enterAt(player3, START_TIME + 3);
 
         (,,, uint256 pool, uint256 count,,) = tournament.getTournament(T_ID);
-        assertEq(pool,  ENTRY_FEE * 3);
+        assertEq(pool, ENTRY_FEE * 3);
         assertEq(count, 3);
     }
 
@@ -259,11 +247,7 @@ contract FruitRushTournamentTest is Test {
         _enterAt(player1, START_TIME + 1);
 
         vm.prank(player1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FruitRushTournament.AlreadyEntered.selector, T_ID, player1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.AlreadyEntered.selector, T_ID, player1));
         tournament.enter(T_ID);
     }
 
@@ -289,11 +273,7 @@ contract FruitRushTournamentTest is Test {
         _createDefault();
         vm.warp(END_TIME + 1);
         vm.prank(player1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FruitRushTournament.EntryPeriodEnded.selector, T_ID, END_TIME
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.EntryPeriodEnded.selector, T_ID, END_TIME));
         tournament.enter(T_ID);
     }
 
@@ -301,11 +281,7 @@ contract FruitRushTournamentTest is Test {
         _createDefault();
         // still at warp 500 (before START_TIME=1000)
         vm.prank(player1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FruitRushTournament.EntryPeriodNotStarted.selector, T_ID, START_TIME
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.EntryPeriodNotStarted.selector, T_ID, START_TIME));
         tournament.enter(T_ID);
     }
 
@@ -372,7 +348,9 @@ contract FruitRushTournamentTest is Test {
         _enterAt(player3, START_TIME + 3);
 
         address[] memory winners = new address[](3);
-        winners[0] = player1; winners[1] = player2; winners[2] = player3;
+        winners[0] = player1;
+        winners[1] = player2;
+        winners[2] = player3;
 
         vm.warp(END_TIME + 1);
         vm.prank(finalizer);
@@ -380,7 +358,7 @@ contract FruitRushTournamentTest is Test {
 
         uint256 pool = 15e18;
         uint256 paid = 7.5e18 + 3.75e18 + 1.5e18; // 12.75
-        uint256 rake = pool - paid;                  // 2.25 = 15%
+        uint256 rake = pool - paid; // 2.25 = 15%
         assertGe(rake * 10_000 / pool, 1_500); // ≥ 15%
     }
 
@@ -448,11 +426,47 @@ contract FruitRushTournamentTest is Test {
         address[] memory winners = new address[](4);
         vm.warp(END_TIME + 1);
         vm.prank(finalizer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                FruitRushTournament.TooManyWinners.selector, 4, 3
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.TooManyWinners.selector, 4, 3));
+        tournament.finalize(T_ID, winners);
+    }
+
+    function test_finalize_duplicateWinnerReverts() public {
+        _createDefault();
+        _enterAt(player1, START_TIME + 1);
+
+        address[] memory winners = new address[](2);
+        winners[0] = player1;
+        winners[1] = player1;
+
+        vm.warp(END_TIME + 1);
+        vm.prank(finalizer);
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.DuplicateWinner.selector, T_ID, player1));
+        tournament.finalize(T_ID, winners);
+    }
+
+    function test_finalize_nonEntrantWinnerReverts() public {
+        _createDefault();
+        _enterAt(player1, START_TIME + 1);
+
+        address[] memory winners = new address[](1);
+        winners[0] = player2;
+
+        vm.warp(END_TIME + 1);
+        vm.prank(finalizer);
+        vm.expectRevert(abi.encodeWithSelector(FruitRushTournament.WinnerNotEntrant.selector, T_ID, player2));
+        tournament.finalize(T_ID, winners);
+    }
+
+    function test_finalize_zeroAddressWinnerReverts() public {
+        _createDefault();
+        _enterAt(player1, START_TIME + 1);
+
+        address[] memory winners = new address[](1);
+        winners[0] = address(0);
+
+        vm.warp(END_TIME + 1);
+        vm.prank(finalizer);
+        vm.expectRevert(FruitRushTournament.ZeroAddress.selector);
         tournament.finalize(T_ID, winners);
     }
 
@@ -489,9 +503,7 @@ contract FruitRushTournamentTest is Test {
         vm.prank(finalizer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                FruitRushTournament.TournamentNotClosed.selector,
-                T_ID,
-                FruitRushTournament.TournamentStatus.Open
+                FruitRushTournament.TournamentNotClosed.selector, T_ID, FruitRushTournament.TournamentStatus.Open
             )
         );
         tournament.finalize(T_ID, w);
@@ -601,9 +613,7 @@ contract FruitRushTournamentTest is Test {
         vm.prank(player1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                FruitRushTournament.TournamentNotOpen.selector,
-                T_ID,
-                FruitRushTournament.TournamentStatus.Refunded
+                FruitRushTournament.TournamentNotOpen.selector, T_ID, FruitRushTournament.TournamentStatus.Refunded
             )
         );
         tournament.enter(T_ID);
@@ -722,8 +732,8 @@ contract FruitRushTournamentTest is Test {
 
         // Tournament state persists
         (uint256 fee,,, uint256 pool, uint256 count,,) = tournament.getTournament(T_ID);
-        assertEq(fee,   ENTRY_FEE);
-        assertEq(pool,  ENTRY_FEE);
+        assertEq(fee, ENTRY_FEE);
+        assertEq(pool, ENTRY_FEE);
         assertEq(count, 1);
     }
 
@@ -732,10 +742,7 @@ contract FruitRushTournamentTest is Test {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @dev Pool conservation: winners' payouts + rake == totalPool exactly.
-    function testFuzz_finalize_poolConservation(
-        uint8 numPlayers,
-        uint8 numWinners
-    ) public {
+    function testFuzz_finalize_poolConservation(uint8 numPlayers, uint8 numWinners) public {
         vm.assume(numPlayers >= 1 && numPlayers <= 10);
         vm.assume(numWinners <= 3); // ≤ prize slots
         vm.assume(numWinners <= numPlayers);
@@ -750,8 +757,10 @@ contract FruitRushTournamentTest is Test {
         for (uint8 i = 0; i < numPlayers; ++i) {
             address p = address(uint160(0xBEEF_0000 + i));
             cusd.mint(p, ENTRY_FEE);
-            vm.prank(p); cusd.approve(address(tournament), ENTRY_FEE);
-            vm.prank(p); tournament.enter(tid);
+            vm.prank(p);
+            cusd.approve(address(tournament), ENTRY_FEE);
+            vm.prank(p);
+            tournament.enter(tid);
         }
 
         uint256 poolBefore = cusd.balanceOf(address(tournament));
@@ -789,8 +798,10 @@ contract FruitRushTournamentTest is Test {
         for (uint8 i = 0; i < numPlayers; ++i) {
             address p = address(uint160(0xCAFE_0000 + i));
             cusd.mint(p, ENTRY_FEE);
-            vm.prank(p); cusd.approve(address(tournament), ENTRY_FEE);
-            vm.prank(p); tournament.enter(tid);
+            vm.prank(p);
+            cusd.approve(address(tournament), ENTRY_FEE);
+            vm.prank(p);
+            tournament.enter(tid);
         }
 
         uint256 pool = cusd.balanceOf(address(tournament));
@@ -799,7 +810,9 @@ contract FruitRushTournamentTest is Test {
             winners[i] = address(uint160(0xCAFE_0000 + i));
         }
         if (numPlayers < 3) {
-            assembly { mstore(winners, numPlayers) }
+            assembly {
+                mstore(winners, numPlayers)
+            }
         }
 
         uint256 trBefore = cusd.balanceOf(treasury);
@@ -818,24 +831,26 @@ contract FruitRushTournamentTest is Test {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 contract MockERC20 {
-    string  public name;
-    string  public symbol;
-    uint8   public decimals;
+    string public name;
+    string public symbol;
+    uint8 public decimals;
     uint256 public totalSupply;
 
-    mapping(address => uint256)                     public balanceOf;
+    mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
     constructor(string memory _n, string memory _s, uint8 _d) {
-        name = _n; symbol = _s; decimals = _d;
+        name = _n;
+        symbol = _s;
+        decimals = _d;
     }
 
     function mint(address to, uint256 amount) external {
         balanceOf[to] += amount;
-        totalSupply    += amount;
+        totalSupply += amount;
         emit Transfer(address(0), to, amount);
     }
 
@@ -848,17 +863,17 @@ contract MockERC20 {
     function transfer(address to, uint256 amount) external returns (bool) {
         require(balanceOf[msg.sender] >= amount, "bal");
         balanceOf[msg.sender] -= amount;
-        balanceOf[to]         += amount;
+        balanceOf[to] += amount;
         emit Transfer(msg.sender, to, amount);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(balanceOf[from]           >= amount, "bal");
+        require(balanceOf[from] >= amount, "bal");
         require(allowance[from][msg.sender] >= amount, "allow");
         allowance[from][msg.sender] -= amount;
-        balanceOf[from]             -= amount;
-        balanceOf[to]               += amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
         emit Transfer(from, to, amount);
         return true;
     }

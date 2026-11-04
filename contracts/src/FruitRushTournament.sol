@@ -63,12 +63,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /// @dev    UUPS-upgradeable.  ReentrancyGuard uses OZ v5 StorageSlot pattern
 ///         and is safe with the proxy storage layout.
 /// @custom:oz-upgrades-unsafe-allow constructor
-contract FruitRushTournament is
-    Initializable,
-    AccessControlUpgradeable,
-    UUPSUpgradeable,
-    ReentrancyGuard
-{
+contract FruitRushTournament is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -76,17 +71,17 @@ contract FruitRushTournament is
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @notice Can create tournaments and perform emergency refunds.
-    bytes32 public constant OPERATOR_ROLE  = keccak256("OPERATOR_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     /// @notice Can finalize tournaments (submit ranked winners).
     bytes32 public constant FINALIZER_ROLE = keccak256("FINALIZER_ROLE");
     /// @notice Can authorize UUPS upgrades.
-    bytes32 public constant UPGRADER_ROLE  = keccak256("UPGRADER_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // ═══════════════════════════════════════════════════════════════════════════
     //  CONSTANTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    uint256 public constant BPS_DENOMINATOR    = 10_000;
+    uint256 public constant BPS_DENOMINATOR = 10_000;
     /// @notice Maximum total prize share — 8 500 bps (85 %). Guarantees ≥ 15 % rake.
     uint256 public constant MAX_PRIZE_SHARE_BPS = 8_500;
 
@@ -94,15 +89,21 @@ contract FruitRushTournament is
     //  TYPES
     // ═══════════════════════════════════════════════════════════════════════════
 
-    enum TournamentStatus { Pending, Open, Closed, Finalized, Refunded }
+    enum TournamentStatus {
+        Pending,
+        Open,
+        Closed,
+        Finalized,
+        Refunded
+    }
 
     struct Tournament {
-        uint256  entryFee;          // cUSD entry fee per player (18-dec wei)
-        uint256  startTime;         // Unix timestamp — entries open
-        uint256  endTime;           // Unix timestamp — entries close
-        uint256  totalPool;         // Accumulated cUSD (entryFee * entrants)
-        uint256[] prizeSharesBps;   // Basis-point share per ranked place
-        address[] entrants;         // All players who entered
+        uint256 entryFee; // cUSD entry fee per player (18-dec wei)
+        uint256 startTime; // Unix timestamp — entries open
+        uint256 endTime; // Unix timestamp — entries close
+        uint256 totalPool; // Accumulated cUSD (entryFee * entrants)
+        uint256[] prizeSharesBps; // Basis-point share per ranked place
+        address[] entrants; // All players who entered
         TournamentStatus status;
     }
 
@@ -128,34 +129,17 @@ contract FruitRushTournament is
 
     /// @notice Emitted when a new tournament is registered.
     event TournamentCreated(
-        uint256 indexed tournamentId,
-        uint256 entryFee,
-        uint256 startTime,
-        uint256 endTime,
-        uint256[] prizeSharesBps
+        uint256 indexed tournamentId, uint256 entryFee, uint256 startTime, uint256 endTime, uint256[] prizeSharesBps
     );
 
     /// @notice Emitted when a player successfully enters a tournament.
-    event PlayerEntered(
-        uint256 indexed tournamentId,
-        address indexed player,
-        uint256 totalEntrants
-    );
+    event PlayerEntered(uint256 indexed tournamentId, address indexed player, uint256 totalEntrants);
 
     /// @notice Emitted when a tournament is finalized and prizes distributed.
-    event TournamentFinalized(
-        uint256 indexed tournamentId,
-        address[] winners,
-        uint256[] payouts,
-        uint256 rake
-    );
+    event TournamentFinalized(uint256 indexed tournamentId, address[] winners, uint256[] payouts, uint256 rake);
 
     /// @notice Emitted when a tournament is cancelled and all entrants refunded.
-    event TournamentRefunded(
-        uint256 indexed tournamentId,
-        uint256 totalRefunded,
-        uint256 entrantCount
-    );
+    event TournamentRefunded(uint256 indexed tournamentId, uint256 totalRefunded, uint256 entrantCount);
 
     /// @notice Emitted when treasury address is updated.
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
@@ -175,6 +159,8 @@ contract FruitRushTournament is
     error AlreadyEntered(uint256 tournamentId, address player);
     error TournamentNotClosed(uint256 tournamentId, TournamentStatus status);
     error TooManyWinners(uint256 winners, uint256 prizeSlots);
+    error DuplicateWinner(uint256 tournamentId, address player);
+    error WinnerNotEntrant(uint256 tournamentId, address player);
     error TournamentNotFinalizable(uint256 tournamentId, TournamentStatus status);
     error ZeroAddress();
     error ZeroEntryFee();
@@ -197,29 +183,26 @@ contract FruitRushTournament is
     /// @param operator_   Address receiving OPERATOR_ROLE (backend).
     /// @param finalizer_  Address receiving FINALIZER_ROLE (backend).
     /// @param treasury_   House rake destination.
-    function initialize(
-        address cUSD_,
-        address admin_,
-        address operator_,
-        address finalizer_,
-        address treasury_
-    ) external initializer {
-        if (cUSD_      == address(0)) revert ZeroAddress();
-        if (admin_     == address(0)) revert ZeroAddress();
-        if (operator_  == address(0)) revert ZeroAddress();
+    function initialize(address cUSD_, address admin_, address operator_, address finalizer_, address treasury_)
+        external
+        initializer
+    {
+        if (cUSD_ == address(0)) revert ZeroAddress();
+        if (admin_ == address(0)) revert ZeroAddress();
+        if (operator_ == address(0)) revert ZeroAddress();
         if (finalizer_ == address(0)) revert ZeroAddress();
-        if (treasury_  == address(0)) revert ZeroAddress();
+        if (treasury_ == address(0)) revert ZeroAddress();
 
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        cUSD     = IERC20(cUSD_);
+        cUSD = IERC20(cUSD_);
         treasury = treasury_;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
-        _grantRole(OPERATOR_ROLE,      operator_);
-        _grantRole(FINALIZER_ROLE,     finalizer_);
-        _grantRole(UPGRADER_ROLE,      admin_);
+        _grantRole(OPERATOR_ROLE, operator_);
+        _grantRole(FINALIZER_ROLE, finalizer_);
+        _grantRole(UPGRADER_ROLE, admin_);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -240,35 +223,40 @@ contract FruitRushTournament is
     /// @param endTime        Unix timestamp when entries close.
     /// @param prizeSharesBps Basis-point prize shares for places 1, 2, 3, …
     function createTournament(
-        uint256   tournamentId,
-        uint256   entryFee,
-        uint256   startTime,
-        uint256   endTime,
+        uint256 tournamentId,
+        uint256 entryFee,
+        uint256 startTime,
+        uint256 endTime,
         uint256[] calldata prizeSharesBps
     ) external onlyRole(OPERATOR_ROLE) {
-        if (_tournaments[tournamentId].endTime != 0)
+        if (_tournaments[tournamentId].endTime != 0) {
             revert TournamentAlreadyExists(tournamentId);
-        if (startTime >= endTime)
+        }
+        if (startTime >= endTime) {
             revert InvalidTimeRange(startTime, endTime);
-        if (entryFee == 0)
+        }
+        if (entryFee == 0) {
             revert ZeroEntryFee();
-        if (prizeSharesBps.length == 0)
+        }
+        if (prizeSharesBps.length == 0) {
             revert EmptyPrizeShares();
+        }
 
         // Validate prize share sum
         uint256 totalBps;
         for (uint256 i; i < prizeSharesBps.length; ++i) {
             totalBps += prizeSharesBps[i];
         }
-        if (totalBps > MAX_PRIZE_SHARE_BPS)
+        if (totalBps > MAX_PRIZE_SHARE_BPS) {
             revert InvalidPrizeShares(totalBps, MAX_PRIZE_SHARE_BPS);
+        }
 
         Tournament storage t = _tournaments[tournamentId];
-        t.entryFee      = entryFee;
-        t.startTime     = startTime;
-        t.endTime       = endTime;
+        t.entryFee = entryFee;
+        t.startTime = startTime;
+        t.endTime = endTime;
         t.prizeSharesBps = prizeSharesBps;
-        t.status        = TournamentStatus.Pending;
+        t.status = TournamentStatus.Pending;
 
         emit TournamentCreated(tournamentId, entryFee, startTime, endTime, prizeSharesBps);
     }
@@ -289,18 +277,20 @@ contract FruitRushTournament is
 
         // Allow entry during Pending (before startTime window opens in UI) or
         // Open status — either way we enforce the time window below.
-        if (t.status == TournamentStatus.Finalized ||
-            t.status == TournamentStatus.Refunded) {
+        if (t.status == TournamentStatus.Finalized || t.status == TournamentStatus.Refunded) {
             revert TournamentNotOpen(tournamentId, t.status);
         }
 
-        if (block.timestamp < t.startTime)
+        if (block.timestamp < t.startTime) {
             revert EntryPeriodNotStarted(tournamentId, t.startTime);
-        if (block.timestamp > t.endTime)
+        }
+        if (block.timestamp > t.endTime) {
             revert EntryPeriodEnded(tournamentId, t.endTime);
+        }
 
-        if (_hasEntered[tournamentId][msg.sender])
+        if (_hasEntered[tournamentId][msg.sender]) {
             revert AlreadyEntered(tournamentId, msg.sender);
+        }
 
         // Mark entered before external call (CEI pattern)
         _hasEntered[tournamentId][msg.sender] = true;
@@ -337,22 +327,37 @@ contract FruitRushTournament is
     ///
     /// @param tournamentId  The tournament to finalize.
     /// @param rankedWinners Ordered list of winner addresses (1st place first).
-    function finalize(
-        uint256   tournamentId,
-        address[] calldata rankedWinners
-    ) external onlyRole(FINALIZER_ROLE) nonReentrant {
+    function finalize(uint256 tournamentId, address[] calldata rankedWinners)
+        external
+        onlyRole(FINALIZER_ROLE)
+        nonReentrant
+    {
         Tournament storage t = _getTournament(tournamentId);
 
-        if (t.status == TournamentStatus.Finalized ||
-            t.status == TournamentStatus.Refunded) {
+        if (t.status == TournamentStatus.Finalized || t.status == TournamentStatus.Refunded) {
             revert TournamentNotFinalizable(tournamentId, t.status);
         }
 
-        if (block.timestamp <= t.endTime)
+        if (block.timestamp <= t.endTime) {
             revert TournamentNotClosed(tournamentId, t.status);
+        }
 
-        if (rankedWinners.length > t.prizeSharesBps.length)
+        if (rankedWinners.length > t.prizeSharesBps.length) {
             revert TooManyWinners(rankedWinners.length, t.prizeSharesBps.length);
+        }
+
+        for (uint256 i; i < rankedWinners.length; ++i) {
+            address winner = rankedWinners[i];
+            if (winner == address(0)) revert ZeroAddress();
+            if (!_hasEntered[tournamentId][winner]) {
+                revert WinnerNotEntrant(tournamentId, winner);
+            }
+            for (uint256 previous; previous < i; ++previous) {
+                if (rankedWinners[previous] == winner) {
+                    revert DuplicateWinner(tournamentId, winner);
+                }
+            }
+        }
 
         // Mark finalized before any transfers (CEI)
         t.status = TournamentStatus.Finalized;
@@ -394,20 +399,18 @@ contract FruitRushTournament is
     ///         events via refundBatch if needed).
     ///
     /// @param tournamentId The tournament to cancel and refund.
-    function refund(uint256 tournamentId)
-        external
-        onlyRole(OPERATOR_ROLE)
-        nonReentrant
-    {
+    function refund(uint256 tournamentId) external onlyRole(OPERATOR_ROLE) nonReentrant {
         Tournament storage t = _getTournament(tournamentId);
 
-        if (t.status == TournamentStatus.Finalized)
+        if (t.status == TournamentStatus.Finalized) {
             revert TournamentNotFinalizable(tournamentId, t.status);
-        if (t.status == TournamentStatus.Refunded)
+        }
+        if (t.status == TournamentStatus.Refunded) {
             revert TournamentNotFinalizable(tournamentId, t.status);
+        }
 
         uint256 count = t.entrants.length;
-        uint256 fee   = t.entryFee;
+        uint256 fee = t.entryFee;
 
         // Mark refunded before any transfers (CEI)
         t.status = TournamentStatus.Refunded;
@@ -441,22 +444,22 @@ contract FruitRushTournament is
         external
         view
         returns (
-            uint256  entryFee,
-            uint256  startTime,
-            uint256  endTime,
-            uint256  totalPool,
-            uint256  entrantCount,
+            uint256 entryFee,
+            uint256 startTime,
+            uint256 endTime,
+            uint256 totalPool,
+            uint256 entrantCount,
             TournamentStatus status,
             uint256[] memory prizeSharesBps
         )
     {
         Tournament storage t = _tournaments[tournamentId];
-        entryFee      = t.entryFee;
-        startTime     = t.startTime;
-        endTime       = t.endTime;
-        totalPool     = t.totalPool;
-        entrantCount  = t.entrants.length;
-        status        = t.status;
+        entryFee = t.entryFee;
+        startTime = t.startTime;
+        endTime = t.endTime;
+        totalPool = t.totalPool;
+        entrantCount = t.entrants.length;
+        status = t.status;
         prizeSharesBps = t.prizeSharesBps;
     }
 
@@ -464,21 +467,13 @@ contract FruitRushTournament is
     /// @param tournamentId Tournament ID.
     /// @param player       Player address to query.
     /// @return entered     True if the player has entered.
-    function hasEntered(uint256 tournamentId, address player)
-        external
-        view
-        returns (bool entered)
-    {
+    function hasEntered(uint256 tournamentId, address player) external view returns (bool entered) {
         entered = _hasEntered[tournamentId][player];
     }
 
     /// @notice Return the list of entrant addresses for a tournament.
     /// @param tournamentId Tournament ID.
-    function getEntrants(uint256 tournamentId)
-        external
-        view
-        returns (address[] memory)
-    {
+    function getEntrants(uint256 tournamentId) external view returns (address[] memory) {
         return _tournaments[tournamentId].entrants;
     }
 
@@ -487,36 +482,23 @@ contract FruitRushTournament is
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @dev Revert if tournament doesn't exist (endTime == 0 is the sentinel).
-    function _getTournament(uint256 tournamentId)
-        internal
-        view
-        returns (Tournament storage t)
-    {
+    function _getTournament(uint256 tournamentId) internal view returns (Tournament storage t) {
         t = _tournaments[tournamentId];
         if (t.endTime == 0) revert TournamentNotFound(tournamentId);
     }
 
     /// @dev UUPS guard — only UPGRADER_ROLE may authorize an upgrade.
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
 
     /// @dev OZ v5 UUPSUpgradeable has no __init function — omitted intentionally.
-    function __UUPSUpgradeable_init() internal onlyInitializing {}
+    function __UUPSUpgradeable_init() internal onlyInitializing { }
 
     // ═══════════════════════════════════════════════════════════════════════════
     //  ERC-165
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @inheritdoc AccessControlUpgradeable
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(AccessControlUpgradeable)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControlUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }
