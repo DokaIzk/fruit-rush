@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { audio } from '../audio'
 import { designArt } from '../assets/designs'
 import {
@@ -6,7 +6,7 @@ import {
   headlineFor,
   type RoundRewards,
 } from '../components/results/resultsRewards'
-import { buildMockLeaderboard } from '../data/leaderboard'
+import { fetchLeaderboard } from '../data/leaderboard'
 import type { GameSessionResult } from '../types/game'
 import '../styles/results.css'
 
@@ -43,11 +43,19 @@ export function ResultsScreen({
   onBoast,
   onHome,
 }: ResultsScreenProps) {
-  const youRank = useMemo(
-    () => buildMockLeaderboard(result.score).entries.find((e) => e.isYou)?.rank ?? 99,
-    [result.score],
-  )
+  const [youRank, setYouRank] = useState(99)
   const headline = headlineFor(result)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchLeaderboard(result.score, 'You', result.mode).then((leaderboard) => {
+      if (cancelled) return
+      setYouRank(leaderboard.entries.find((entry) => entry.isYou)?.rank ?? 99)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [result.score, result.mode])
   const [rewards, setRewards] = useState<RoundRewards | null>(null)
 
   useEffect(() => {

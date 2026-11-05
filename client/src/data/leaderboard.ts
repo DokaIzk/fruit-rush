@@ -58,10 +58,36 @@ export function buildMockLeaderboard(
   return { period: 'weekly', entries: merged }
 }
 
-/** Future: replace body with `fetch('/api/leaderboard?period=weekly')`. */
+import { fetchApiLeaderboard } from '../api'
+
+/** Fetch the real leaderboard; fall back to the local demo only when the backend is unavailable. */
 export async function fetchLeaderboard(
   playerScore: number,
-  playerName?: string,
+  playerName = 'You',
+  gameMode: 'Classic' | 'Zen' | 'Arcade' | 'Tournament' = 'Classic',
 ): Promise<LeaderboardResponse> {
-  return buildMockLeaderboard(playerScore, playerName)
+  try {
+    const response = await fetchApiLeaderboard(gameMode)
+    const entries: LeaderboardEntry[] = response.entries.map((entry, index) => ({
+      id: entry.playerAddress,
+      rank: index + 1,
+      name: entry.playerAddress.slice(0, 6) + '…' + entry.playerAddress.slice(-4),
+      score: entry.score,
+      avatar: entry.hasBoast ? '🏆' : '⭐',
+      trophy: index === 0 ? ('gold' as const) : index === 1 ? ('silver' as const) : index === 2 ? ('bronze' as const) : null,
+    }))
+
+    if (playerScore > 0 && !entries.some((entry) => entry.name === playerName)) {
+      entries.push({ id: 'you', rank: 0, name: playerName, score: playerScore, avatar: '⭐', trophy: null, isYou: true })
+      entries.sort((a, b) => b.score - a.score)
+      entries.forEach((entry, index) => { entry.rank = index + 1 })
+    } else {
+      const you = entries.find((entry) => entry.name === playerName)
+      if (you) you.isYou = true
+    }
+
+    return { period: 'weekly', entries }
+  } catch {
+    return buildMockLeaderboard(playerScore, playerName)
+  }
 }

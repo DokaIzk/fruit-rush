@@ -153,6 +153,18 @@ export async function loginWithSocial(provider: SocialProvider): Promise<WalletS
   }
 }
 
+/** Current Magic DID token for authenticated backend requests. */
+export async function getMagicIdToken(): Promise<string | null> {
+  if (!isMagicConfigured()) return null
+  try {
+    const magic = getMagic()
+    if (!(await magic.user.isLoggedIn())) return null
+    return await magic.user.getIdToken()
+  } catch {
+    return null
+  }
+}
+
 /** Active Magic Celo address, or throws if logged out. */
 export async function getWalletAddress(): Promise<string> {
   const magic = getMagic()

@@ -40,6 +40,13 @@ export interface TournamentInfo {
   splits: { place: string; share: string }[]
 }
 
+export interface GameInputEvent {
+  t: number
+  x: number
+  y: number
+  velocity: number
+}
+
 export interface GameSessionResult {
   playerId: string
   score: number
@@ -53,6 +60,9 @@ export interface GameSessionResult {
   bombsHit: number
   criticalSlices: number
   accuracy: number
+  inputEventLog?: GameInputEvent[]
+  backendSessionId?: string
+  backendValidation?: 'valid' | 'invalid' | 'unavailable'
 }
 
 export interface PlayerProfile {

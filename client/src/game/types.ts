@@ -28,9 +28,17 @@ export interface GameHudState {
   countdown: number
 }
 
+export interface GameInputEvent {
+  t: number
+  x: number
+  y: number
+  velocity: number
+}
+
 export interface GameEndPayload {
   score: number
   comboHighwater: number
+  inputEventLog: GameInputEvent[]
   durationSeconds: number
   mode: GameMode
   fruitsSliced: number

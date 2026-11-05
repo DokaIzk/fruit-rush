@@ -5,6 +5,8 @@ import { WalletMenu } from './components/WalletMenu'
 import type { GameEndPayload } from './game/types'
 import { LoadingScreen } from './screens/LoadingScreen'
 import { useWallet } from './state/useWallet'
+import { getMagicIdToken } from './auth/magicAuth'
+import { signBoast, validateGameSession } from './api'
 import type { GameMode, GameSessionResult, ScreenId } from './types/game'
 
 /** Lazy screens — keep Pixi, shop, results, etc. out of the boot JS graph. */
@@ -337,12 +339,44 @@ export default function App() {
         bombsHit: payload.bombsHit,
         criticalSlices: payload.criticalSlices,
         accuracy: payload.accuracy,
+        inputEventLog: payload.inputEventLog,
       })
       setMintedId(null)
+
+      void getMagicIdToken().then((token) => {
+        if (!token || (!wallet.address && wallet.status !== 'connected')) return
+        if (!payload.inputEventLog?.length) return
+        void validateGameSession(token, {
+          playerId: wallet.address!,
+          score: payload.score,
+          mode: payload.mode,
+          comboHighwater: payload.comboHighwater,
+          durationSeconds: payload.durationSeconds,
+          timestamp: Date.now(),
+          isPersonalBest,
+          fruitsSliced: payload.fruitsSliced,
+          fruitsMissed: payload.fruitsMissed,
+          bombsHit: payload.bombsHit,
+          criticalSlices: payload.criticalSlices,
+          accuracy: payload.accuracy,
+          inputEventLog: payload.inputEventLog,
+        }).then((validation) => {
+          setLastResult((current) => current ? {
+            ...current,
+            backendSessionId: validation.sessionId,
+            backendValidation: validation.valid ? 'valid' : 'invalid',
+          } : current)
+          if (!validation.valid) showToast(validation.rejectionReason || 'Score could not be validated')
+        }).catch((error: unknown) => {
+          setLastResult((current) => current ? { ...current, backendValidation: 'unavailable' } : current)
+          const message = error instanceof Error ? error.message : 'Backend unavailable'
+          showToast(message)
+        })
+      })
       // Replace /play in history so Back from results returns to modes, not a new game.
       navigate('results', { replace: true })
     },
-    [navigate, personalBest, wallet.address],
+    [navigate, personalBest, wallet.address, wallet.status, showToast],
   )
 
   const showWallet =
@@ -487,17 +521,30 @@ export default function App() {
           <BoastScreen
             mintedId={mintedId}
             minting={minting}
-            onMint={() => {
+            onMint={async () => {
               if (!wallet.requireConnect()) {
                 showToast(saveProgressToast(wallet.inMiniPay))
                 return
               }
+              if (!lastResult.backendSessionId) {
+                showToast('Score is still being validated')
+                return
+              }
+              const token = await getMagicIdToken()
+              if (!token) {
+                showToast('Email sign-in is required to save a boast')
+                return
+              }
               setMinting(true)
-              window.setTimeout(() => {
-                setMintedId(Math.floor(1000 + Math.random() * 9000))
+              try {
+                const result = await signBoast(token, lastResult.backendSessionId)
+                setMintedId(result.nonce)
+                showToast('Boast signature saved')
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Could not save boast')
+              } finally {
                 setMinting(false)
-                showToast('Boast saved (demo)')
-              }, 900)
+              }
             }}
             onShare={async () => {
               const url = `https://fruitrush.gg/boast/${mintedId ?? 'demo'}`

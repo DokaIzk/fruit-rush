@@ -1269,9 +1269,23 @@ export class FruitRushGame {
     const durationSeconds = Math.max(1, Math.round((performance.now() - this.sessionStart) / 1000))
     const attempts = this.fruitsSliced + this.fruitsMissed
     const accuracy = attempts === 0 ? 100 : Math.round((this.fruitsSliced / attempts) * 100)
+    const width = this.app?.screen.width ?? this.host.clientWidth
+    const height = this.app?.screen.height ?? this.host.clientHeight
+    const inputEventLog = this.trail.slice(-10_000).map((point, index, points) => {
+      const previous = index > 0 ? points[index - 1] : point
+      const elapsedMs = Math.max(1, point.t - previous.t)
+      const distance = Math.hypot(point.x - previous.x, point.y - previous.y)
+      return {
+        t: Math.max(0, Math.round(point.t - this.sessionStart)),
+        x: Math.min(1, Math.max(0, point.x / width)),
+        y: Math.min(1, Math.max(0, point.y / height)),
+        velocity: distance / elapsedMs,
+      }
+    })
     this.onEnd({
       score: this.score,
       comboHighwater: this.comboHigh,
+      inputEventLog,
       durationSeconds,
       mode: this.mode,
       fruitsSliced: this.fruitsSliced,
