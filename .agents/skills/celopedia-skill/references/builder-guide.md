@@ -54,10 +54,61 @@ Users can pay gas fees with ERC-20 tokens instead of native CELO. This is Celo's
 | BRLm (cREAL) | 18 | `0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787` | `0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787` (same) |
 | USDC | 6 | `0xcebA9300f2b948710d2653dD7B07f33A8B32118C` | `0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B` (adapter) |
 | USDT | 6 | `0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e` | `0x0e2a3e05bc9a16f5292a6170456a710cb89c6f72` (adapter) |
+| USA₮ | 6 | `0xD2ab3C9A02DBBAB236BfEC45D1d755DF4267F771` | `0x0357EE22278c922e1D36cFe6b899269b161880C4` (adapter) |
+
+> **USA₮** (Tether America USD) — US-regulated dollar issued by Anchorage Digital Bank, N.A. (first federally chartered digital asset bank in the US). GENIUS Act compliant. Launched on Celo Mainnet March 31, 2026. **Not the same as USD₮ (USDT)** — different issuer, different trust profile, designed for institutional and compliance-sensitive use cases.
 
 The table above is the common subset. The **full allowlist is larger** — it also includes many Mento local-currency stablecoins (KESm, COPm, GHSm, NGNm, ZARm, GBPm, and more) plus a few other assets. Rather than hardcode the whole list, **fetch it live** with `getCurrencies()` (see below) — that's the canonical, always-current source. For MiniPay Mini Apps and consumer payments, **USDm, USDC, and USDT** are the fee currencies users actually hold, so default to those.
 
 > **Wallet/SDK support:** fee abstraction works in Celo-native wallets (MiniPay, Valora) today, with **Ledger support coming soon**. On the SDK side, **viem** supports the `feeCurrency` field natively — **ethers.js and web3.js do not**.
+
+### Gas overhead of paying fees in a stablecoin
+
+Paying the network fee in a stablecoin costs meaningfully more gas than paying
+in CELO — the debit and credit run through the fee-currency machinery (and,
+for 6-decimal tokens, an adapter) on top of the transaction itself.
+
+**A widely repeated figure puts this at "approximately 50,000 gas". That is
+low, and it is not a constant — it depends on the token.** Measured over
+**2,600 consecutive Celo mainnet blocks** (ending block 77,155,261), comparing
+the `gasUsed` of plain ERC-20 `transfer` calls that paid in CELO against
+identical `transfer` calls that set `feeCurrency`:
+
+| Fee currency | Gas — paid in CELO | Gas — paid in the token | Overhead | Samples (token / CELO) |
+|---|---|---|---|---|
+| **USDm** (18-dec, no adapter) | 39,799 | 80,499 | **≈ +40,700** | 1 / 1 |
+| **USDT** (6-dec, adapter) | 43,801 | 115,501 | **≈ +71,700** | 6,970 / 3,143 |
+| **USDC** (6-dec, adapter) | 45,047 | 159,759 | **≈ +114,712** | 7 / 100 |
+
+Medians; distributions are tight (USDT p25 = p75 = 115,501).
+
+**What this means in practice:**
+
+- **Budget ~2.5–3.5× the gas** of an equivalent CELO-paid transaction, not
+  ~50,000 flat. The old figure is roughly right only for the 18-decimal,
+  no-adapter case.
+- **The adapter costs real gas.** 6-decimal tokens (USDC, USDT) carry
+  substantially more overhead than 18-decimal Mento stablecoins, because the
+  adapter normalizes decimals on both the debit and the refund.
+- **USDC is the expensive one.** Its overhead measured ~1.6× USDT's. If you're
+  choosing a default fee currency for a high-frequency app and your users hold
+  both, USDT is cheaper per transaction.
+- Absolute cost is still tiny — Celo gas is ~$0.0005 per transaction — so this
+  matters for **contract design and gas limits**, not for user-visible pricing.
+  Set gas limits from the fee-currency figures, or transactions will fail
+  estimation.
+
+> **Confidence:** the USDT row is measured across ~10,000 transactions and is
+> solid. **USDm and USDC fee-currency samples are small** (n=1 and n=7) because
+> almost nobody pays fees in them — of 6,978 fee-currency ERC-20 transfers in
+> the window, 6,970 were USDT. Treat those two rows as indicative. An
+> independent controlled check (re-estimating real USDC CIP-64 transfers at
+> their original block, with and without `feeCurrency`) returned a consistent
+> +130,161, which agrees on the order of magnitude.
+>
+> **Reproduce it:** sample recent blocks, keep successful `transfer` calls
+> (selector `0xa9059cbb`) to a given token, bucket by whether the transaction
+> carries a `feeCurrency` field, and compare median `gasUsed`.
 
 The `FeeCurrencyDirectory` contract at `0x15F344b9E6c3Cb6F0376A36A64928b13F62C6276` governs the allowlist. Query it:
 
@@ -122,7 +173,7 @@ In `foundry.toml`:
 ```toml
 [etherscan]
 celo = { key = "${ETHERSCAN_API_KEY}", chain = 42220 }
-alfajores = { key = "${ETHERSCAN_API_KEY}", chain = 44787 }
+celoSepolia = { key = "${ETHERSCAN_API_KEY}", chain = 11142220 }
 ```
 
 Then:
@@ -146,6 +197,30 @@ forge verify-contract <CONTRACT_ADDRESS> <CONTRACT_NAME> \
   --verifier blockscout \
   --verifier-url https://celo.blockscout.com/api
 ```
+
+### Sourcify
+
+Decentralized verification — the source is stored publicly rather than inside
+one explorer, and Blockscout picks it up automatically. Useful when you want
+the verification to outlive any single explorer, or when you deployed from
+Remix and never had a local build.
+
+```bash
+curl -X POST "https://sourcify.dev/server/verify" \
+  -F "address=0xYOUR_ADDRESS" \
+  -F "chain=42220" \
+  -F "files[0]=@MyContract.sol" \
+  -F "files[1]=@metadata.json"
+```
+
+The `metadata.json` is the compiler output — Sourcify matches its hash against
+the deployed bytecode, so the match is exact rather than a recompile guess.
+
+From Remix: activate the **Sourcify** plugin in Plugin Manager, pick the
+deployed contract and the network (Celo `42220`, Celo Sepolia `11142220`), and
+verify. **MiniPay note:** listing requires contracts verified on **Celoscan**
+specifically — Sourcify is a complement, not a substitute. See
+`minipay-requirements.md` §5.
 
 ---
 
@@ -235,9 +310,9 @@ Celo staking operations (via stCELO Manager) are expensive: ~800K-1M gas per ope
 
 Celo migrated from L1 to L2 on March 26, 2025 (block 31,056,500). Old tutorials referencing Celo as an L1 are outdated. The current stack is OP Stack + EigenDA + ZK fault proofs.
 
-### 8. `eth_getLogs` — 50K Block Range Limit
+### 8. `eth_getLogs` — 5,000 Block Range Limit
 
-Celo RPCs reject `eth_getLogs` spans > ~50,000 blocks with error `-32011 block range is too large`. Any indexer or event-history feature must paginate. See `network-info.md` → _RPC Limits & Gotchas_ for the chunked viem workaround.
+Forno mainnet rejects `eth_getLogs` when `toBlock - fromBlock` is more than 5,000, with error `-32602 query exceeds range, retry smaller (max block range 5000, …)`. Any indexer or event-history feature must paginate. See `network-info.md` → _RPC Limits & Gotchas_ for the chunked viem workaround.
 
 ### 9. viem strict EIP-55 checksum
 

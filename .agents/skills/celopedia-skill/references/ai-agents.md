@@ -1,6 +1,6 @@
 # AI Agent Infrastructure on Celo
 
-> Sources: docs.celo.org/build-on-celo/build-with-ai/*, celo-org/agent-skills
+> Sources: docs.celo.org/build/agents/*, celo-org/agent-skills
 
 Celo is positioning itself as the payments and trust layer for AI agents — sub-cent fees, 1-second finality, native stablecoins, and purpose-built protocols for agent identity, reputation, and payments.
 
@@ -162,14 +162,14 @@ Registering an agent runs metadata through a validator (e.g. 8004scan). The four
 
 Protocol enabling pay-per-request APIs using HTTP 402 status code and stablecoin payments.
 
-**Reference**: https://www.x402.org | https://github.com/coinbase/x402
+**Reference**: https://www.x402.org | https://github.com/x402-foundation/x402
 
 ### How It Works
 
 1. Client sends request to protected endpoint
 2. Server returns `402 Payment Required` with payment requirements
 3. Client signs a stablecoin payment
-4. Client retries with `X-PAYMENT` header containing signed payment
+4. Client retries with a `PAYMENT-SIGNATURE` header containing the signed payment (`X-PAYMENT` in x402 v1)
 5. Server verifies payment via facilitator
 6. Server settles on-chain and delivers response
 
@@ -187,18 +187,18 @@ Celo runs an official hosted x402 facilitator, so builders don't need to run the
 
 **Always fetch `https://x402.celo.org/SKILL.md` before writing integration code** — it carries the current, settlement-verified seller (`@x402/hono` / `@x402/express`) and buyer (`@x402/fetch`) code for this facilitator.
 
-**Metering model** (snapshot — confirm via `/api/config`): connect a wallet on the dashboard and sign a message (no gas) → API key with free starter credits (500 mainnet / 1,000 testnet). Each on-chain `/settle` costs 1 credit (flat $0.001, topped up with USDC on the dashboard). `/verify` and `/supported` are free and need no key.
+**Getting found:** a working 402 is invisible until it describes itself and is listed. Baseline for any Celo endpoint: the `bazaar` extension in the 402, an agent402.tools registration, an ERC-8004 identity, and a Buy catalog listing request. Coinbase's index and x402scan need an offer on a network they support. Full entry rules and a verified snippet: `x402-seller-discoverability.md`.
+
+**Metering model** (snapshot of `/api/config` as of 2026-10-13 — confirm there, it changes): connect a wallet on the dashboard and sign a message (no gas) → API key with free starter credits (**20 mainnet** / 1,000 testnet). After the free credits, the config shows `pricePerTxMicro: 4000` (= $0.004 per settlement) and `feeBps: 30` (0.3% of payment value); the Agents on Open Rails page describes the paid tier as gas at cost plus 0.3% from a prepaid balance (topped up with USDC on the dashboard) — check the dashboard for the exact current schedule. `/verify` and `/supported` are free and need no key.
 
 **Integration gotchas for this facilitator:**
 
 - Use the **v2 scoped `@x402/*` packages** (`@x402/hono` or `@x402/express` + `@x402/core` + `@x402/evm`; buyer: `@x402/fetch`). The legacy `x402-express` / `x402-fetch` packages have no Celo entry in their network enum and will not work.
-- Celo is **not in the x402 packages' default-asset table** — a bare `price: "$0.01"` type-checks but throws at request time. Always pass the explicit price object: `{ amount: "10000", asset: USDC_ADDRESS, extra: { name: "USDC", version: "2" } }` (string amounts in 6-decimal base units; `$0.01 = "10000"`).
+- `@x402/evm`'s default-asset table **includes Celo** (`eip155:42220`: USDC since 2.21.0, USDT and USAT since 2.26.0), so a bare `price: "$0.01"` resolves to USDC. Pass the explicit price object to pin a different asset, or for any token outside that table (wFIAT, cNGN): `{ amount: "10000", asset: USDC_ADDRESS, extra: { name: "USDC", version: "2" } }` (string amounts in the token's base units; for 6-decimal USDC, `$0.01 = "10000"`). Check the installed `@x402/evm` version if a bare price throws: before 2.21.0 there is no Celo entry, and before 2.26.0 only USDC.
 - Attach the API key with `HTTPFacilitatorClient({ createAuthHeaders })` as `X-API-Key` — it goes only to the facilitator, never to buyers or the browser.
 - `payTo` is the **seller's own receiving wallet** — not the facilitator, not the buyer.
-- **Token support (EIP-3009)**: USDC (mainnet + Sepolia) and USDT (mainnet). **USDm is NOT supported by this facilitator** — Mento `StableTokenV2` implements only EIP-2612 `permit`, not EIP-3009. USDT's EIP-712 domain is `name: "Tether USD", version: "1"` (its `version()` method reverts).
+- **Token support**: USDC, USDT, and USAT settle via **EIP-3009**; all six Ripio wFIAT stablecoins (**wARS, wBRL, wMXN, wCOP, wPEN, wCLP**) and cNGN settle via **Permit2** (set `assetTransferMethod: "permit2"` in the route config), and **USDm / Mento locals are NOT supported** — Mento `StableTokenV2` implements only EIP-2612 `permit`, not EIP-3009. Testnet supports USDC only. See _Enabled tokens_ below; the live list is in `https://x402.celo.org/SKILL.md`. USDT's EIP-712 domain is `name: "Tether USD", version: "1"` (its `version()` method reverts).
 - Test on Celo Sepolia first — testnet USDC from https://faucet.circle.com (buyers need no testnet CELO; gas is sponsored).
-
-The thirdweb flow below is an **alternative** that uses thirdweb's own facilitator instead — and it is the path to take when you want to charge in **USDm or other Mento local stablecoins**, which the hosted facilitator cannot settle (see the USDm caveat below).
 
 ### Supported Tokens on Celo
 
@@ -208,74 +208,112 @@ The thirdweb flow below is an **alternative** that uses thirdweb's own facilitat
 | USDT | `0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e` | 6 |
 | USDm | `0x765DE816845861e75A25fCA122bb6898B8B1282a` | 18 |
 
-> ⚠️ **USDm / Mento local stablecoin caveat.** USDm — and the rest of the Mento family (EURm, BRLm, KESm, …; all `StableTokenV2`/`V3` implementations, verified on-chain) — implements EIP-2612 `permit` only, **not** EIP-3009 `transferWithAuthorization`. So Mento stablecoins do **not** work with the hosted Celo facilitator, whose engine currently implements only the EIP-3009 transfer method. The x402 `exact` EVM spec also defines Permit2 / EIP-2612 fallback methods, and facilitators that implement them (e.g. **thirdweb**, which accepts "ERC-2612 permit" tokens) can settle USDm and the local stablecoins. This matters for agents that price or settle in local currencies — e.g. FX and trading agents paying per-request in KESm or BRLm — which should use the thirdweb flow. Rule: **match the token to your facilitator's supported transfer methods** — hosted Celo facilitator → USDC/USDT; thirdweb → also USDm + Mento locals.
+**Enabled on the hosted Celo facilitator (mainnet, `eip155:42220`)** — snapshot from `https://api.x402.celo.org/supported` as of 2026-10-21; confirm there before shipping. Addresses for the USAT and Ripio rows are in [contracts.md](contracts.md).
 
-### Server Implementation (Next.js)
+| Token | Transfer method | Decimals |
+|-------|-----------------|----------|
+| USDC | EIP-3009 | 6 |
+| USDT | EIP-3009 | 6 |
+| USAT (shown as USA₮ in some partner copy) | EIP-3009 | 6 |
+| wARS, wBRL, wMXN, wCOP, wPEN, wCLP (Ripio) | Permit2 — needs `assetTransferMethod: "permit2"` | 18 |
+| cNGN | Permit2 — needs `assetTransferMethod: "permit2"`; no EIP-2612 `permit()`, so the payer sends `approve(Permit2, amount)` once (again when it runs out) and the route must not declare `eip2612GasSponsoring` | 6 |
 
-```typescript
-import { settlePayment, facilitator } from "thirdweb/x402";
+Testnet (`eip155:11142220`): USDC only.
 
-export async function POST(req: Request) {
-  const paymentHeader =
-    req.headers.get("payment-signature") || req.headers.get("x-payment");
+> ⚠️ **USDm / Mento local stablecoin caveat.** USDm — and the rest of the Mento family (EURm, BRLm, KESm, …; all `StableTokenV2`/`V3` implementations, verified on-chain) — implements EIP-2612 `permit` only, **not** EIP-3009 `transferWithAuthorization`. So Mento stablecoins do **not** work with the hosted Celo facilitator, whose engine implements EIP-3009 (USDC/USDT/USAT) and Permit2 for the Ripio wFIAT tokens and cNGN, but not a payment authorized by the token's own EIP-2612 `permit`. This matters for agents that price or settle in local currencies, e.g. FX and trading agents paying per request. Rule: **match the token to your facilitator's supported transfer methods**, and check a facilitator's `/supported` before pricing in a token. On the hosted Celo facilitator that is USDC/USDT/USAT plus the six Ripio wFIAT and cNGN (Permit2).
 
-  if (!paymentHeader) {
-    return new Response(JSON.stringify({
-      error: "Payment Required",
-      scheme: "fixed",
-      price: "100000",        // 0.10 USDC (6 decimals)
-      // x402 `currency` = the ERC-20 being charged (USDC token address). NOT the `feeCurrency`
-      // adapter. Gas for the on-chain settlement is separate — if the settler pays gas in USDC,
-      // it must use the USDC adapter (0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B) in `feeCurrency`.
-      currency: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
-      chainId: 42220,
-    }), { status: 402 });
-  }
+### Seller (Hono, hosted Celo facilitator)
 
-  const result = await settlePayment({
-    paymentHeader,
-    facilitator,
-    secretKey: process.env.THIRDWEB_SECRET_KEY!,
-  });
+Adapted from `https://x402.celo.org/SKILL.md`, which is the source of truth for this facilitator; re-check it before shipping. For Express, swap `@x402/hono` for `@x402/express`. The only custom piece is the facilitator client that attaches your API key. A runnable seller and buyer pair is at https://github.com/celo-org/x402-celo-example.
 
-  if (!result.success) {
-    return new Response("Payment failed", { status: 402 });
-  }
-
-  // Deliver the resource
-  return new Response(JSON.stringify({ data: "your content here" }));
-}
+```bash
+npm i @x402/hono @x402/core @x402/evm viem
 ```
 
-### Client Implementation (React)
-
 ```typescript
-import { useFetchWithPayment } from "thirdweb/react";
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { HTTPFacilitatorClient, type RoutesConfig } from "@x402/core/server";
+import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { getAddress } from "viem";
 
-function MyComponent() {
-  const fetchWithPayment = useFetchWithPayment();
+const NETWORK = "eip155:11142220"; // Celo Sepolia (mainnet: eip155:42220, api.x402.celo.org)
+const USDC = getAddress("0x01C5C0122039549AD1493B8220cABEdD739BC44E"); // Sepolia USDC
 
-  async function callPaidAPI() {
-    const response = await fetchWithPayment("/api/paid-endpoint", {
-      method: "POST",
-      body: JSON.stringify({ query: "hello" }),
-    });
-    const data = await response.json();
-  }
-}
+// The API key goes only to the facilitator, never to buyers or the browser.
+const facilitator = new HTTPFacilitatorClient({
+  url: "https://api.x402.sepolia.celo.org",
+  createAuthHeaders: async () => {
+    const h = { "X-API-Key": process.env.X402_API_KEY! };
+    return { verify: h, settle: h, supported: h };
+  },
+});
+
+const server = new x402ResourceServer(facilitator);
+server.register("eip155:*", new ExactEvmScheme());
+
+// Typed, so `network` stays a CAIP-2 string instead of widening to `string`.
+const routes: RoutesConfig = {
+  "GET /premium": {
+    accepts: [
+      {
+        scheme: "exact",
+        network: NETWORK,
+        payTo: getAddress(process.env.SELLER_PAY_TO!), // your own receiving wallet
+        price: {
+          amount: "10000", // $0.01 in USDC base units (6 decimals)
+          asset: USDC,
+          extra: { name: "USDC", version: "2" }, // EIP-712 domain for EIP-3009
+        },
+      },
+    ],
+    description: "Premium content",
+  },
+};
+
+const app = new Hono();
+app.use(paymentMiddleware(routes, server)); // routes first, then the server
+app.get("/premium", (c) => c.json({ data: "this response cost $0.01" }));
+
+serve({ fetch: app.fetch, port: 3000 });
 ```
 
-### Client Implementation (TypeScript)
+What goes over the wire (x402 v2, [HTTP transport spec](https://github.com/x402-foundation/x402/blob/main/specs/transports-v2/http.md)): the server answers `402` with a `PAYMENT-REQUIRED` header holding the base64-encoded payment requirements (`scheme: "exact"` for a fixed price; `"upto"` caps a metered one). The client retries with a base64 `PAYMENT-SIGNATURE` header, and the server returns the settlement result in `PAYMENT-RESPONSE`. v1 used `X-PAYMENT` and `X-PAYMENT-RESPONSE`. For EIP-3009 tokens the signed authorization carries a random 32-byte `nonce` and a `validAfter`/`validBefore` window, and the token contract rejects a nonce it has already seen, so a captured payment cannot be replayed.
+
+### Buyer (`@x402/fetch`)
+
+The buyer needs a wallet holding the asset the seller prices in, no facilitator API key, and no CELO for gas on the hosted facilitator.
+
+```bash
+npm i @x402/fetch @x402/evm viem
+```
 
 ```typescript
-import { wrapFetchWithPayment } from "thirdweb/x402";
-import { privateKeyToAccount } from "thirdweb/wallets";
+import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
+import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { privateKeyToAccount } from "viem/accounts";
+import { getAddress } from "viem";
 
-const account = privateKeyToAccount(process.env.PRIVATE_KEY!);
-const fetchWithPayment = wrapFetchWithPayment(fetch, account);
+const account = privateKeyToAccount(process.env.BUYER_PRIVATE_KEY as `0x${string}`);
+const NETWORK = "eip155:11142220"; // Celo Sepolia (mainnet: eip155:42220)
+const USDC = getAddress("0x01C5C0122039549AD1493B8220cABEdD739BC44E"); // Sepolia USDC
 
-const response = await fetchWithPayment("https://api.example.com/data");
+const client = new x402Client();
+// The client refuses, before signing, any asset outside its default-asset table and
+// anything above "$1" per payment. Allow the asset with an atomic per-payment cap.
+client.setSpendControls({
+  allowedAssets: [{ network: NETWORK, asset: USDC, maxAmountPerPayment: "10000" }],
+});
+// { rpcUrl } lets the scheme read the chain; Permit2 assets need it to sign the sponsored permit.
+client.register("eip155:*", new ExactEvmScheme(account, { rpcUrl: "https://forno.celo.org" }));
+const payFetch = wrapFetchWithPayment(fetch, client);
+
+const res = await payFetch("https://your-server.example/premium"); // pays on 402, then retries
+console.log(res.status, await res.json());
 ```
+
+For a Permit2 asset (wARS, wBRL, wCOP, wMXN, wPEN, wCLP, cNGN), list its address in `allowedAssets` the same way, with the cap in that token's own base units; these are not in the default-asset table and are refused otherwise.
 
 ### Why Celo for x402
 
@@ -325,24 +363,25 @@ pipx install celo-mcp
 
 | Tool | Description |
 |------|-------------|
-| `get_network_status` | Current block, gas price, chain info |
-| `get_block` | Block details by number |
-| `get_latest_blocks` | Recent blocks |
-| `get_account` | Account balance and nonce |
+| `get_network_status` | Network status and connection information |
+| `get_block` | Block details by number or hash |
 | `get_transaction` | Transaction details by hash |
-| `get_token_info` | ERC-20 token metadata |
-| `get_token_balance` | ERC-20 balance for address |
-| `get_celo_balances` | CELO + stablecoin balances |
-| `get_nft_info` | ERC-721/1155 metadata |
-| `get_nft_balance` | NFT balance for address |
-| `call_contract_function` | Read contract state |
-| `estimate_contract_gas` | Estimate gas for contract call |
-| `estimate_transaction` | Estimate gas for transaction |
-| `get_gas_fee_data` | Current gas fee data |
-| `get_governance_proposals` | List governance proposals |
-| `get_proposal_details` | Proposal details by ID |
+| `get_latest_blocks` | Most recent blocks, with offset support |
+| `get_token_balance` | Token balance for an address, given the token contract address |
+| `get_celo_balances` | CELO and stable token balances for an address |
+| `get_stable_token_balance` | Balances of major stable tokens and CELO for an address, via multicall |
+| `get_gas_fee_data` | Current gas fee data, including EIP-1559 fees |
+| `get_governance_proposals` | Governance proposals, with pagination |
+| `get_proposal_details` | Details of a governance proposal by ID |
+| `get_staking_balances` | Active and pending stakes for an address, by validator group |
+| `get_activatable_stakes` | Pending stakes that can be activated |
+| `get_validator_groups` | Validator groups with members, votes, capacity, and performance metrics |
+| `get_validator_group_details` | Details of one validator group, including members and performance data |
+| `get_total_staking_info` | Network-wide staking information, including total votes and participation metrics |
 
-Supports: ERC-20, ERC-721, ERC-1155, Mento stablecoins, governance proposals.
+These 15 tools are the ones registered in `list_tools` at [celo-org/celo-mcp@77bfcca](https://github.com/celo-org/celo-mcp/blob/77bfcca1dd15b14b25280bf32fbb512637d0de88/src/celo_mcp/server.py) (`async def list_tools`). The installed version may differ; the server's `tools/list` response is authoritative. `main` has since added two faucet tools for Celo Sepolia, `request_faucet_funds` and `get_faucet_request_status` ([celo-org/celo-mcp#33](https://github.com/celo-org/celo-mcp/pull/33)); they are not in `celo-mcp` 0.4.1, the latest PyPI release as of 2026-10-23.
+
+Covers network and block data, token and stable-token balances, gas fees, governance proposals, and staking and validator-group data.
 
 ---
 
@@ -382,7 +421,7 @@ Skills activate automatically based on project context (e.g., `hardhat.config.ts
 
 ## Self Agent ID: Proof-of-Human for Agents
 
-Self Agent ID is the **proof-of-human extension on top of ERC-8004**: a soulbound NFT that binds an agent's key to a unique human via a zero-knowledge passport proof (Self Protocol). It makes an agent **sybil-resistant** without exposing personal data, and is required for the Celo Agent Visa Work tier and scored in Proof of Ship's AI Agents prize.
+Self Agent ID is the **proof-of-human extension on top of ERC-8004**: a soulbound NFT that binds an agent's key to a unique human via a zero-knowledge passport proof (Self Protocol). It makes an agent **sybil-resistant** without exposing personal data, and is required for the Celo Agent Visa Work tier.
 
 **For the full registration reference — modes, the `POST /api/agent/register` flow, gotchas, and example curl — see `self-agent-id.md`.** Register at `https://app.ai.self.xyz`; docs at `https://docs.self.xyz/self-agent-id`.
 
@@ -398,7 +437,125 @@ A tiered program for AI agents that transact on Celo — the further your agent 
 | **Work Visa** | Self Agent ID verification · 1,000+ txns · $5K+ volume (or 1,000 unique contracts) · live product with real utility | DeFi incentives, liquidity support, featured placement |
 | **Citizenship** | Work Visa criteria + 10,000+ txns or $15K+ volume · manual review | Flagship support, deepest integrations |
 
-Benefits across tiers include access to MiniPay's 16M+ users, DeFi incentives (Uniswap, Aave, Mento, Velodrome), token-launch liquidity, mentorship, and co-marketing. Self Agent ID is the gate for the Work tier — register it first.
+Benefits across tiers include access to MiniPay's 20M+ activated wallets, DeFi incentives (Uniswap, Aave, Mento, Velodrome), token-launch liquidity, mentorship, and co-marketing. Self Agent ID is the gate for the Work tier — register it first.
+
+---
+
+## AskBots: paid structured feedback between agents and builders
+
+> Sources: askbots.ai, askbots.ai/skill.md, npmjs.com/package/askbots
+
+A two-sided marketplace on Celo: **builders** pay for structured reviews of what they've built; **agents** earn USDT by writing those reviews. Funds sit in an on-chain escrow contract rather than a platform wallet, and payment settles the moment a review passes the quality gate.
+
+This is the only protocol in this file where an agent **earns** rather than spends — ERC-8004 covers agent identity and x402 covers agents paying; this covers agents being paid for work.
+
+**Live**: https://www.askbots.ai | **Skill file**: https://www.askbots.ai/skill.md
+
+### Economics
+
+| | |
+|---|---|
+| Paid to the reviewing agent | **$0.10 USDT** per accepted response |
+| Platform fee | **$0.01 USDT** per response |
+| Cost to the builder | **$0.11** per response |
+| Gas | **None for the builder** — a platform relayer submits the transaction against a signed ERC-2612 permit |
+| Settlement | On-chain escrow on Celo; unspent budget refunded to the builder |
+
+A ten-review project costs $1.10. Payment is immediate on acceptance — no approval queue.
+
+### For agents: earn by reviewing
+
+Earning needs no wallet signature and no chain interaction — the reviewer surface is plain HTTP with a Bearer token. You need a Celo address only to be paid to.
+
+**Base URL**: `https://www.askbots.ai/api`
+
+**Register** (no prior credentials needed):
+
+```bash
+curl -X POST https://www.askbots.ai/api/auth/openclaw \
+  -H "Content-Type: application/json" \
+  -d '{"name": "YOUR_NAME", "description": "Brief description of what you do"}'
+```
+
+Returns an `apiKey` (prefix `askbots_`) and an `agentId`. **The key is returned once and cannot be recovered** — store it before anything else:
+
+```bash
+mkdir -p ~/.config/askbots
+echo '{"apiKey": "askbots_YOUR_KEY"}' > ~/.config/askbots/credentials.json
+chmod 600 ~/.config/askbots/credentials.json
+```
+
+Authenticate every later call with `Authorization: Bearer askbots_YOUR_KEY`.
+
+Projects are matched to your declared skills. You review the product, answer the builder's questions, solve an anti-human challenge, and the payout lands in your Celo wallet.
+
+`https://www.askbots.ai/skill.md` is the canonical, always-current endpoint reference — read it rather than caching endpoints, since it is served from the running app.
+
+#### Throughput limits
+
+Reviewer capacity is rate-limited by account age and rating:
+
+| Account age | Reviews/day at the default starting rating |
+|---|---|
+| < 7 days | **2** |
+| 7–30 days | **5** |
+| 30–90 days | **15** |
+| 90+ days | **30** |
+
+Separately, an agent with **no ratings yet** may hold at most **2 concurrent assignments**. That cap lifts only once a project creator rates one of your reviews.
+
+**Practical consequence**: an agent registered a week before it needs to work is on the 5/day tier when work arrives; one registered the same day is on 2/day. If you plan to review at volume — for a hackathon, say — register early.
+
+### For builders: get your project reviewed
+
+```bash
+npx askbots submit --file submission.json
+```
+
+Validates the submission, prices it, and prints a cost preview. **Dry run is the default** — nothing is spent unless `--execute` is passed.
+
+```json
+{
+  "name": "My Mini App",
+  "propertyType": "miniapp",
+  "propertyUrl": "https://example.com",
+  "budget": 10,
+  "skillFilters": [],
+  "locationFilters": [],
+  "questions": [
+    { "id": "q1", "text": "Is the onboarding clear?", "type": "freeform" },
+    { "id": "q2", "text": "What breaks on mobile?", "type": "freeform" }
+  ]
+}
+```
+
+`propertyType` is one of `website`, `api`, `mcp_server`, `skill_file`, `miniapp`. Question types are `freeform`, `multiple_choice`, `multiselect`, `rating`. Maximum 20 questions; maximum budget 1000 responses.
+
+Exit codes are stable, so an agent can branch on them without parsing prose:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Runtime error — file unreadable, network, server |
+| `2` | Bad command line — unknown flag, missing argument |
+| `3` | Invalid submission document |
+| `4` | Not implemented in this version |
+
+`--json` emits machine-readable output on every command.
+
+**Current version `0.1.1`** validates and prices. **`--execute` (on-chain funding) is not implemented yet** — it exits `4` with an explicit message rather than failing silently. Fund through askbots.ai in the meantime.
+
+### Quality gates
+
+Submissions are checked **before** payment, because a payment cannot be clawed back:
+
+- **Content floor** — boilerplate, near-duplicate and question-echo responses are rejected before any record is written, so a blocked submission never reaches the payout path.
+- **Cross-agent duplicate detection** — a response matching a *different* agent's answer on the same project is flagged for human review.
+- **Automated grading** — a scoring pass rejects low-specificity reviews, returning a reason to the submitting agent.
+- **Script-aware** — length and duplicate checks segment text properly, so reviews in Japanese, Chinese, Thai and other scripts without whitespace word boundaries are held to the same standard as English rather than rejected as "too short".
+- **Reputation ranking** — the leaderboard ranks on a statistical lower bound rather than a raw average, so one well-rated review does not outrank a long track record.
+
+**For agents this is the operative part**: a generic paragraph pasted across projects does not earn. Specific, evidence-carrying reviews — a status code, a selector, a repro step — do.
 
 ---
 
@@ -408,11 +565,12 @@ Celo is **actively pushing builders toward onchain agents** — agents that hold
 
 - **Consumer money (save / send / spend)**: savings-coach and round-up agents, group savings (chama / stokvel) pools, remittance concierge, bill-pay & autopay, FX-hedging agents that dollarize a local-currency paycheck. Highest PMF — emerging-market retail.
 - **Agentic commerce & marketplaces**: local-commerce concierge with escrow, cross-border shopping agents, subscription managers — settling via x402 micropayments.
+- **Agents that pay by card or sign in to websites** (merchants with no stablecoin or x402 option): Agent Vault by Self Labs gives an agent spending-limited card payments and logins without exposing the card number or password. It is not a Celo protocol and does not use x402 — see [agent-vault.md](agent-vault.md).
 - **DeFAI (crypto-native)**: conversational DeFi agents that compose Mento + Aave + Ubeswap, set-and-forget yield optimizers, DCA / strategy agents, onchain tax & portfolio assistants.
 - **Social, predictions & viral**: localized prediction markets, tip-to-earn creator agents, donation / round-up-to-cause agents.
 - **SMB, freelancers & identity infra**: invoice / get-paid agents, sybil-resistant airdrop & quest tools, SMS/USSD wallets for feature phones, and an MCP server for Celo. Pair human- or operator-facing flows with **Self Agent ID** for trust.
 
-Many of these benefit from **Self Agent ID** (one-human-one-spot) to prevent sybil/ghost-account fraud, and qualify for the **Agent Visa** and **Proof of Ship** AI agent tracks once live on mainnet.
+Many of these benefit from **Self Agent ID** (one-human-one-spot) to prevent sybil/ghost-account fraud, and qualify for the **Agent Visa** tiers once live on mainnet.
 
 **Resources:**
 - Agent ideas: https://github.com/celo-org/ai-agent-ideas
@@ -421,7 +579,9 @@ Many of these benefit from **Self Agent ID** (one-human-one-spot) to prevent syb
 
 ---
 
-## Onchain Agents Hackathon
+## Onchain Agents Hackathon (past)
+
+> **Ended June 15, 2026.** Kept as a reference for how Celo hackathons are run; for the current one see `grants-funding.md` → _Agents on Open Rails Hackathon_.
 
 A Celo DevRel-run hackathon for building onchain agents focused on **real-world payments and everyday applications** — May 22 – June 15, 2026, **$5K prize pool in CELO**. Winning agents generate real transactions and demonstrate genuine on-chain utility (not prototypes). Full details: **https://bit.ly/OnchainAgentsHackathon**
 

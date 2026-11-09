@@ -1,6 +1,6 @@
 # Celo SDK Quick Reference
 
-> Sources: docs.celo.org/tooling/libraries-sdks/*, celo-org/agent-skills
+> Sources: docs.celo.org/build/tools/libraries-sdks/*, celo-org/agent-skills
 
 ---
 
@@ -63,7 +63,7 @@ await walletClient.writeContract({
 });
 ```
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/viem/index
+**Docs**: https://docs.celo.org/build/tools/libraries-sdks/viem/index
 
 ---
 
@@ -107,7 +107,7 @@ function PayWithUSDm() {
 }
 ```
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/wagmi (if available) or https://wagmi.sh
+**Docs**: https://wagmi.sh
 
 ---
 
@@ -137,7 +137,7 @@ const election = await kit.contracts.getElection();
 const validators = await election.getValidatorGroupsVotes();
 ```
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/contractkit/index
+**Docs**: https://docs.celo.org/build/tools/libraries-sdks/contractkit/index
 
 ---
 
@@ -145,9 +145,9 @@ const validators = await election.getValidatorGroupsVotes();
 
 Pre-built React components themed for Celo dApps.
 
-**Install**: Check https://docs.celo.org/tooling/libraries-sdks/composer-kit for latest install instructions.
+**Install**: Check https://docs.celo.org/build/tools/libraries-sdks/composer-kit for latest install instructions.
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/composer-kit
+**Docs**: https://docs.celo.org/build/tools/libraries-sdks/composer-kit
 
 ---
 
@@ -170,7 +170,7 @@ const contract = getContract({
 });
 ```
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/thirdweb-sdk/index
+**Docs**: https://docs.celo.org/build/tools/dev-environments/thirdweb
 
 ---
 
@@ -189,7 +189,7 @@ const balance = await provider.getBalance("0xAddress");
 
 Note: ethers.js does NOT have native `feeCurrency` support. Use viem for fee abstraction.
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/ethers/index
+**Docs**: https://docs.celo.org/build/tools/libraries-sdks/ethers/index
 
 ---
 
@@ -201,7 +201,7 @@ Standard web3.js works with Celo.
 
 Note: Like ethers.js, web3.js does NOT have native `feeCurrency` support. Use viem for fee abstraction.
 
-**Docs**: https://docs.celo.org/tooling/libraries-sdks/web3/index
+**Docs**: https://docs.celo.org/build/tools/libraries-sdks/web3/index
 
 ---
 
@@ -209,10 +209,58 @@ Note: Like ethers.js, web3.js does NOT have native `feeCurrency` support. Use vi
 
 | Library | Use Case | Docs |
 |---------|----------|------|
-| Reown (WalletConnect) | Multi-wallet connection | https://docs.celo.org/tooling/libraries-sdks/reown/index |
-| Dynamic | Embedded wallets + social login | https://docs.celo.org/tooling/libraries-sdks/dynamic/index |
-| JAW | Wallet abstraction | https://docs.celo.org/tooling/libraries-sdks/jaw/index |
-| Portal | Wallet infrastructure | https://docs.celo.org/tooling/libraries-sdks/portal/index |
+| Reown (WalletConnect) | Multi-wallet connection | https://docs.celo.org/build/tools/libraries-sdks/reown/index |
+| Dynamic | Embedded wallets + social login | https://docs.celo.org/build/tools/libraries-sdks/dynamic/index |
+| JAW | Wallet abstraction | https://docs.celo.org/build/tools/libraries-sdks/jaw/index |
+| Portal | Wallet infrastructure | https://docs.celo.org/build/tools/libraries-sdks/portal/index |
+
+### Reown AppKit — Celo config
+
+The wagmi adapter, with Celo mainnet and the current testnet. Get a project ID
+at https://cloud.reown.com.
+
+```typescript
+// config.ts
+import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
+import { celo, celoSepolia } from "@reown/appkit/networks";
+
+export const wagmiAdapter = new WagmiAdapter({
+  networks: [celo, celoSepolia],
+  projectId: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID!,
+  ssr: true,
+});
+
+export const config = wagmiAdapter.wagmiConfig;
+```
+
+```tsx
+// providers.tsx
+"use client";
+import { createAppKit } from "@reown/appkit/react";
+import { celo, celoSepolia } from "@reown/appkit/networks";
+import { wagmiAdapter } from "./config";
+
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks: [celo, celoSepolia],
+  projectId: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID!,
+  metadata: {
+    name: "My Celo App",
+    description: "Celo dApp",
+    url: "https://myapp.com",
+    icons: ["https://myapp.com/icon.png"],
+  },
+});
+```
+
+> ⚠️ Most Reown/AppKit examples still import **`celoAlfajores`**. That chain is
+> sunset — use `celoSepolia`. See `network-info.md` → _Alfajores is sunset_.
+>
+> ⚠️ **Do not use AppKit inside MiniPay.** Like RainbowKit, it renders a
+> multi-wallet selection modal, which conflicts with MiniPay's injected-wallet
+> auto-connect requirement. Use `injected()` or raw
+> `custom(window.ethereum)` there — see the MiniPay row below and
+> `minipay-requirements.md` §1.
 
 ---
 
@@ -244,7 +292,7 @@ Quick prototype?
 
 ## Building for MiniPay? Read This First
 
-MiniPay is Celo's embedded stablecoin wallet with 14M+ users across 60+ countries. If you are building a Mini App for MiniPay, the SDK patterns above apply — but with **important constraints and required patterns** that differ from a standard Celo dApp.
+MiniPay is Celo's embedded stablecoin wallet with 20M+ wallet activations across 70+ countries. If you are building a Mini App for MiniPay, the SDK patterns above apply — but with **important constraints and required patterns** that differ from a standard Celo dApp.
 
 ### SDK choice for MiniPay
 

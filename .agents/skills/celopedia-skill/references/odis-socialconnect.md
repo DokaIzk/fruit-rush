@@ -65,7 +65,7 @@ const serviceContext = OdisUtils.Query.getServiceContext(
 );
 ```
 
-For **Alfajores**, use `OdisContextName.ALFAJORES` instead.
+For testnet, use the **Celo Sepolia** context. (`OdisContextName.ALFAJORES` appears in older guides — Alfajores is sunset; see `network-info.md` → _Alfajores is sunset_.)
 
 **Important:** The **combiner URL and public key** bundled in your installed `@celo/identity` may **differ** from older blog/docs tables (e.g. legacy `cloudfunctions.net` URLs). Trust the SDK’s `getServiceContext` for the version you ship.
 
@@ -185,7 +185,7 @@ You may call **FederatedAttestations** with **viem** `readContract` and **`Feder
 
 ## Documentation links
 
-- [Query On-Chain Identifiers with ODIS (ContractKit)](https://docs.celo.org/tooling/libraries-sdks/contractkit/odis)
+- [Query On-Chain Identifiers with ODIS (ContractKit)](https://docs.celo.org/build/tools/libraries-sdks/contractkit/odis)
 - [Data encryption key (DEK)](https://docs.celo.org/developer/contractkit/data-encryption-key) (Celo docs)
 - Legacy context: [ODIS use case: phone number privacy](https://docs.celo.org/legacy/protocol/identity/odis-use-case-phone-number-privacy)
 

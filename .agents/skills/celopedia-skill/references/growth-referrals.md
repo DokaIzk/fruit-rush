@@ -122,7 +122,7 @@ function depositWithReferrer(uint256 amount, address referrer) external {
 
 ### Pattern 2 — Off-chain attribution → on-chain payout
 
-The frontend uses a referral code (`?ref=ABCD`) in the URL. Your backend matches the code to the inviter address. Payouts are batched on-chain weekly.
+The frontend uses a referral code (`?ref=ABCD`) in the URL. Your backend matches the code to the inviter address. Payouts are batched on-chain weekly. For the batching mechanics — which contract to use, gas costs, chunk sizes, and the idempotency trap that makes a retried run double-pay — see `bulk-payouts.md`.
 
 **Pros**: works for users who don't see the referrer field (e.g. mobile WebView quirks), allows non-on-chain referral sources (Twitter, WhatsApp share links).
 **Cons**: requires you to trust the backend's attribution — if your team is questioned about referral fraud, you can't prove the chain of attribution like Pattern 1.
@@ -150,8 +150,6 @@ The biggest risk of an open referral program: one person creates 100 wallets, re
 | Manual review of suspicious patterns (one wallet referring 50+ in a day) | Medium | High operational cost |
 
 **Recommended starting stack**: cap rewards per referrer per week + require invitee to take a meaningful first action + hold rewards in 7-day escrow. This blocks 90%+ of sybil attempts without adding friction for real users.
-
-If you're paying meaningful USDT (>$5 per referral) or your app explicitly markets the referral program ("earn $$ by inviting friends"), graduate to Self.xyz ZK passport verification — see `minipay-self-zk.md` (ships in a follow-up PR). The 10-20% drop-off is worth it when fraud risk is real money.
 
 ---
 

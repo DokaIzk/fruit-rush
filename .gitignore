@@ -3,8 +3,11 @@
 # Goldsky ABI exports (generated from Foundry artifacts)
 abis/*.json
 
-# Node modules (if any)
+# Node modules and generated subgraph build output
 node_modules/
+subgraph/node_modules/
+subgraph/generated/
+subgraph/build/
 
 # OS files
 .DS_Store

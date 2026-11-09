@@ -1,7 +1,7 @@
 # Celo Contract Addresses
 
-> Source: https://docs.celo.org/tooling/contracts/
-> Last updated: 2026-04-15
+> Source: https://docs.celo.org/build/tools/contracts/core-contracts
+> Last updated: 2026-10-19
 
 All addresses verified from official Celo documentation. **Do not guess addresses not listed here.**
 
@@ -70,7 +70,6 @@ All addresses verified from official Celo documentation. **Do not guess addresse
 | Mountain Protocol USD | USDM | `0x59D9356E565Ab3A36dD77763Fc0d87fEaf85508C` |
 | Angle USD | USDA | `0x0000206329b97DB379d5E1Bf586BbDB969C63274` |
 | Angle Euro | EURA | `0xC16B81Af351BA9e64C1a069E3Ab18c244A1E3049` |
-| VNX Euro | VEUR | `0x9346F43c1588B6DF1D52bdD6Bf846064F92d9Cba` |
 | VNX British Pound | VGBP | `0x7aE4265eCFC1F31bc0E112DfCFe3D78E01f4BB7f` |
 | VNX Swiss Franc | VCHF | `0xC5ebEa9984C485EC5D58cA5a2D376620d93aF871` |
 | Glo Dollar | USDGLO | `0x4F604735c1cF31399C6E711D5962b2B3E0225AD3` |
@@ -85,12 +84,20 @@ All addresses verified from official Celo documentation. **Do not guess addresse
 | Ripio Chilean Peso | wCLP | `0x61D450a098b6a7f69fC4b98CE68198fe59768651` |
 | Wrapped Ether | WETH | `0xD221812de1BD094f35587EE8E174B07B6167D9Af` |
 | CELO (ERC-20) | CELO | `0x471EcE3750Da237f93B8E339c536989b8978a438` |
+| cNGN (Nigerian Naira, regulated) | cNGN | `0xF6829D7393dAe24509eb1E52eE8e572e2E271a4f` |
+| IDRX (Indonesian Rupiah) | IDRX | `0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22` |
 
-> Third-party stablecoins above are sourced from and verified against the official list: https://docs.celo.org/build-on-celo/build-with-local-stablecoin (addresses confirmed on-chain).
+> Third-party stablecoins above are sourced from and verified against the official list: https://docs.celo.org/build/build-with-local-stablecoin (addresses confirmed on-chain).
 >
 > **Ticker collisions to watch** (match on address, not symbol): Mountain Protocol's **USDM** (yield-bearing, US-Treasury-backed) is **not** Celo's **USDm** (cUSD, the Mento dollar). Minteo's **COPM** (`0xC92E…`) is **not** Mento's **COPm** (`0x8A56…`).
 
 > **USAT** (Tether America USD) launched on Celo in April 2026 — a USD stablecoin backed by short-term T-bills + cash (supervised by Anchorage Digital). **6 decimals** (like USDC/USDT). It is a whitelisted fee currency; its `feeCurrency` adapter is `0x0357EE22278c922e1D36cFe6b899269b161880C4` (18-decimal adapter — use the adapter, not the token, in the `feeCurrency` field). Caveat: upstream price oracles don't yet index the Celo contract address, so Valora-derived wallets may show `priceUsd: NaN` until that's resolved.
+
+> **IDRX** (Indonesian Rupiah, issued by [IDRX](https://idrx.co/)) is live on Celo Mainnet as of 2026-09-09 — the same address it uses on Base, Lisk and other EVM chains (`0x18Bc…3C22`), per IDRX's own [supported-chain list](https://docs.idrx.co/introduction/supported-chain-and-contract-address). **2 decimals** — `name()`/`symbol()` both return `IDRX`, `decimals()` returns `2`, read on-chain 2026-09-14 — so `1 IDRX = 100` raw units; anything that assumes 6 or 18 decimals is off by 10⁴ or 10¹⁶ silently. It is an upgradeable proxy (ERC-1967/UUPS). It is **not** a fee currency and has no `permit()` / EIP-3009 — a transfer needs CELO for gas.
+
+**Ripio wFIAT notes** (added Jul 2026):
+- `wBRL` ≠ `BRLm`: `wBRL` is Ripio-issued; `BRLm` (cREAL) is Mento-issued — different issuers, different risk profiles
+- wFIAT tokens are **not** supported in MiniPay (MiniPay wallet only handles USDT, USDC, USDm)
 
 ---
 
@@ -195,6 +202,33 @@ Supported assets: USDC, USDT, EURm, USDm, CELO, WETH
 
 ---
 
+## Batch Distribution & Utility Contracts (Mainnet)
+
+For bulk payouts, airdrops, and mass distribution. Every address below was confirmed to
+hold bytecode on Celo Mainnet on 2026-09-24. Usage guidance, gas costs, and batch sizing:
+`bulk-payouts.md`.
+
+| Contract | Address | Notes |
+|----------|---------|-------|
+| Disperse | `0xD152f549545093347A162Dce210e7293f1452150` | `disperseEther` `0xe63d38ed`, `disperseToken` `0xc73a2d60`, `disperseTokenSimple` `0x51ba162c` |
+| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | Batched **reads** only. Inside a Multicall3 call `msg.sender` is Multicall3, so it cannot move a caller's tokens. |
+| Safe singleton 1.4.1 | `0x41675C099F32341bf84BFc5382aF534df5C7461a` | |
+| Safe singleton 1.3.0 (L2) | `0x3E5c63644E683549055b9Be8653de26E0B4CD36E` | |
+| SafeProxyFactory 1.3.0 | `0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2` | |
+| MultiSend 1.3.0 | `0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761` | `delegatecall` variant |
+| MultiSendCallOnly 1.3.0 | `0x40A2aCCbd92BCA938b02010E17A5b8929b49130D` | Used by the Safe CSV Airdrop app |
+| MultiSendCallOnly 1.4.1 | `0x9641d764fc13c8B624c04430C7356C1C7C8102e2` | |
+| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Signature-based approvals |
+| Superfluid Host | `0xA4Ff07cF81C02CFD356184879D953970cA957585` | Streaming / distribution pools |
+| Superfluid CFAv1 | `0x9d369e78e1a682cE0F8d9aD849BeA4FE1c3bD3Ad` | Constant Flow Agreement |
+| Superfluid GDAv1 | `0x308b7405272d11494716e30C6E972DbF6fb89555` | General Distribution Agreement (distribution pools) |
+
+Safe supports Celo officially (chain `42220`, UI at <https://safe.celo.org>). Note the
+`Multicall2` entry in the Uniswap V3 table above is **Uniswap's own deployment**, not a
+general-purpose multicall.
+
+---
+
 ## Testnet Contracts (Celo Sepolia)
 
 ### Core Protocol
@@ -217,8 +251,11 @@ Supported assets: USDC, USDT, EURm, USDm, CELO, WETH
 
 | Token | Symbol | Address |
 |-------|--------|---------|
-| USDm | USDm | `0xEF4d55D6dE8e8d73232827Cd1e9b2F2dBb45bC80` |
-| EURm | EURm | `0x6B172e333e2978484261D7eCC3DE491E79764BbC` |
+| USDm | USDm | `0xdE9e4C3ce781b4bA68120d6261cbad65ce0aB00b` |
+| EURm | EURm | `0xA99dC247d6b7B2E3ab48a1fEE101b83cD6aCd82a` |
+| Celo Dollar (legacy) | cUSD | `0xEF4d55D6dE8e8d73232827Cd1e9b2F2dBb45bC80` |
+| Celo Euro (legacy) | cEUR | `0x6B172e333e2978484261D7eCC3DE491E79764BbC` |
+| Celo Brazilian Real (legacy) | cREAL | `0x13d68A1Bf4a8cB7d9feF54EF70401871b666269c` |
 | BRLm | BRLm | `0x2294298942fdc79417DE9E0D740A4957E0e7783a` |
 | USDC | USDC | `0x01C5C0122039549AD1493B8220cABEdD739BC44E` |
 | USDT | USDT | `0xd077A400968890Eacc75cdc901F0356c943e4fDb` |
@@ -236,16 +273,14 @@ Supported assets: USDC, USDT, EURm, USDm, CELO, WETH
 | CADm | CADm | `0xF151c9a13b78C84f93f50B8b3bC689fedc134F60` |
 | AUDm | AUDm | `0x5873Faeb42F3563dcD77F0fbbdA818E6d6DA3139` |
 
-### Uniswap V3 (Alfajores Testnet)
-
-| Contract | Address |
-|----------|---------|
-| UniswapV3Factory | `0x229Fd76DA9062C1a10eb4193768E192bdEA99572` |
-| NonfungiblePositionManager | `0x0eC9d3C06Bc0A472A80085244d897bb604548824` |
-| SwapRouter02 | `0x8C456F41A3883bA0ba99f810F7A2Da54D9Ea3EF0` |
-| QuoterV2 | `0x3c1FCF8D6f3A579E98F4AE75EB0adA6de70f5673` |
-| UniversalRouter | `0x84904B9E85F76a421223565be7b596d7d9A8b8Ce` |
-| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+> **Sepolia is not mainnet here — do not copy the mainnet pattern.** On **mainnet**,
+> USDm/EURm are the *same contracts* cUSD/cEUR were, renamed: `0x765DE816…` returns
+> `name() = "Mento Dollar", symbol() = "USDm"` today. On **Celo Sepolia** they are
+> **two separate deployments** — the legacy `0xEF4d55D6…` / `0x6B172e33…` still return
+> `cUSD` / `cEUR`, and USDm/EURm live at the new addresses above. A testnet integration
+> that reuses the mainnet mental model will point at the wrong token. Verified by
+> `eth_call symbol()` against `forno.celo-sepolia.celo-testnet.org` and
+> `forno.celo.org` on 2026-08-28.
 
 ### L1 Contracts on Sepolia
 
