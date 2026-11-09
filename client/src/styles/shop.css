@@ -1,0 +1,99 @@
+/* ── Shop — shared shell header + pill filters + two-column wood grid ───── */
+
+.shop-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.shop-filters::-webkit-scrollbar { display: none; }
+
+/* Chips styled after the shared shell chip */
+.shop-filters__chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(8, 20, 14, 0.85);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  white-space: nowrap;
+  min-height: 34px;
+  cursor: pointer;
+}
+
+/* Active filter — lime fill, dark text */
+.shop-filters__chip[aria-selected='true'] {
+  background: var(--lime);
+  color: #14330f;
+  border-color: transparent;
+}
+
+/* Two-column grid of wood cards */
+.armory-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* "armory" naming avoids the legacy .shop-card rules in global.css */
+.armory-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px 12px;
+}
+
+.armory-card__visual {
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  margin-bottom: 6px;
+}
+
+.armory-card__copy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 6px;
+  text-align: center;
+}
+
+.armory-card__copy strong {
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.armory-card__copy p {
+  margin: 0;
+  color: var(--cream-dim);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  flex: 1;
+}
+
+/* Buy button fills the card bottom; price text sized down to fit */
+.armory-card__buy {
+  width: 100%;
+  min-height: 48px;
+  font-size: 1rem;
+  padding: 0 10px;
+}
+
+/* Disabled outlined "Owned/Equipped" */
+.armory-card__owned {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 16px;
+  border: 3px solid rgba(244, 239, 226, 0.2);
+  color: var(--cream-dim);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-transform: uppercase;
+  cursor: default;
+}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { audio } from '../audio'
+import { ArrowLeft } from '../components/icons'
 import '../styles/settings.css'
 
 interface SettingsScreenProps {
@@ -55,24 +56,24 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
         onClick={close}
       />
 
-      <div className="settings-screen__card">
+      <div className="wood-panel settings-screen__card">
         <button
           type="button"
-          className="settings-screen__back"
+          className="round-btn round-btn--sm settings-screen__back"
           aria-label="Close"
           onClick={close}
         >
-          ‹
+          <ArrowLeft size={20} />
         </button>
 
         <p className="settings-screen__eyebrow">Fruit Rush</p>
-        <h1 className="settings-screen__title">Settings</h1>
+        <h1 className="display settings-screen__title">Settings</h1>
         <p className="settings-screen__blurb">Make it juicy. Or keep your own playlist.</p>
 
         <div className="settings-rows" role="group" aria-label="Audio">
           <button
             type="button"
-            className={`settings-row${sfx ? ' is-on' : ''}`}
+            className={`wood-panel settings-row${sfx ? ' is-on' : ''}`}
             onClick={() => void toggleSfx()}
             aria-pressed={sfx}
           >
@@ -88,7 +89,7 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
 
           <button
             type="button"
-            className={`settings-row${music ? ' is-on' : ''}`}
+            className={`wood-panel settings-row${music ? ' is-on' : ''}`}
             onClick={() => void toggleMusic()}
             aria-pressed={music}
           >
@@ -103,7 +104,7 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
           </button>
         </div>
 
-        <button type="button" className="btn-primary settings-screen__cta" onClick={() => void testSlice()}>
+        <button type="button" className="btn btn--orange settings-screen__cta" onClick={() => void testSlice()}>
           Test a slice
         </button>
       </div>

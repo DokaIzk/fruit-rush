@@ -59,9 +59,16 @@ const ERC20_TRANSFER_ABI = [
   },
 ] as const
 
-/** True when `VITE_MAGIC_PUBLISHABLE_KEY` is set. */
+function magicPublishableKey(): string | undefined {
+  return (
+    import.meta.env.VITE_MAGIC_PUBLISHABLE_KEY?.trim() ||
+    import.meta.env.VITE_MAGIC_PUBLIC_KEY?.trim()
+  ) || undefined
+}
+
+/** True when either the canonical publishable-key variable or its legacy alias is set. */
 export function isMagicConfigured(): boolean {
-  return Boolean(import.meta.env.VITE_MAGIC_PUBLISHABLE_KEY?.trim())
+  return Boolean(magicPublishableKey())
 }
 
 /**
@@ -78,9 +85,9 @@ export function getMagicNetwork() {
 }
 
 function requirePublishableKey(): string {
-  const key = import.meta.env.VITE_MAGIC_PUBLISHABLE_KEY?.trim()
+  const key = magicPublishableKey()
   if (!key) {
-    throw new Error('Missing VITE_MAGIC_PUBLISHABLE_KEY — add it to client/.env')
+    throw new Error('Missing Magic publishable key — set VITE_MAGIC_PUBLISHABLE_KEY in client/.env or Vercel')
   }
   return key
 }
@@ -172,6 +179,25 @@ export async function getWalletAddress(): Promise<string> {
   if (!loggedIn) throw new Error('Not signed in with Magic')
   const info = await magic.user.getInfo()
   return asAddress(info.wallets?.ethereum?.publicAddress)
+}
+
+/**
+ * Magic's embedded Celo provider + address, for on-chain writes
+ * (boast minting). Returns null when signed out or unconfigured.
+ */
+export async function getMagicBoastProvider(): Promise<{
+  provider: EIP1193Provider
+  address: `0x${string}`
+} | null> {
+  if (!isMagicConfigured()) return null
+  try {
+    const magic = getMagic()
+    if (!(await magic.user.isLoggedIn())) return null
+    const address = (await getWalletAddress()) as `0x${string}`
+    return { provider: magic.rpcProvider as EIP1193Provider, address }
+  } catch {
+    return null
+  }
 }
 
 /** Personal_sign via the Magic EIP-1193 provider (Boast attestations, etc.). */

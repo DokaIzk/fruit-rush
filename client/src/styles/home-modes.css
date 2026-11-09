@@ -1,0 +1,95 @@
+/* ── Home + Modes — real HTML/CSS over the wood plank background ─────────── */
+
+.home-screen,
+.modes-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  background-size: cover;
+  background-position: center;
+  color: var(--cream);
+  overflow-y: auto;
+}
+.home-screen::before,
+.modes-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5,20,12,0.55), rgba(5,20,12,0.25) 40%, rgba(5,20,12,0.7));
+  pointer-events: none;
+}
+.home-screen > *,
+.modes-screen > * { position: relative; }
+
+/* Home */
+.home-screen__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  /* Clear the 52–58px settings/wallet chips pinned at 3.2% on each side */
+  padding: 0 68px;
+}
+/* (Top-bar chips use the shared .app-screen__chip styles) */
+.home-screen__logo {
+  width: 88%;
+  max-width: 340px;
+  margin: 24px auto 0;
+  display: block;
+  filter: drop-shadow(0 4px 6px rgba(20, 10, 4, 0.55));
+}
+.home-screen__tagline {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--cream);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 0 var(--wood-edge);
+}
+.home-screen__play { margin-top: auto; width: 100%; }
+
+/* Carved-wood plaques */
+.home-screen__tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.home-screen__tile-icon {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 4px;
+}
+.home-screen__tile {
+  min-height: 140px;
+  border-radius: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px;
+  color: var(--cream);
+  cursor: pointer;
+  box-shadow: inset 0 2px 0 rgba(255, 220, 160, 0.25), 0 6px 0 var(--wood-edge);
+}
+.home-screen__tile > svg {
+  color: var(--cream);
+}
+.home-screen__tile strong {
+  font-size: 1.5rem;
+  text-shadow: 0 3px 0 var(--wood-edge);
+}
+.home-screen__kicker { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cream-dim); }
+
+/* Modes */
+.modes-screen__top { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.modes-screen__top h1 { margin: 0; font-size: 1.8rem; }
+.modes-screen__back { width: 44px; height: 44px; font-size: 1.2rem; flex: none; }
+.modes-screen__list { display: flex; flex-direction: column; gap: 16px; }
+.modes-screen__sign { text-align: left; min-height: 120px; display: flex; align-items: center; color: var(--cream); }
+.modes-screen__sign h2 { margin: 0 0 8px; font-size: 1.9rem; }
+.modes-screen__guest { margin-top: 16px; text-align: center; color: var(--cream); font-size: 0.8rem; text-shadow: 0 1px 2px #000; }

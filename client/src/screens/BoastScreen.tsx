@@ -1,13 +1,25 @@
-import { ArtScreen } from '../components/ArtScreen'
-import { Hotspot } from '../components/Hotspot'
-import { designArt } from '../assets/designs'
+export type MintStep = 'idle' | 'signing' | 'approving' | 'minting'
 
 interface BoastScreenProps {
   onMint: () => void
   onShare: () => void
   onDismiss: () => void
+  /** On-chain boast ID once minted (null until the BoastMinted receipt lands). */
   mintedId?: number | null
-  minting?: boolean
+  /** Verified score of the run being boasted. */
+  score?: number | null
+  mintStep?: MintStep
+  /** Contract fee formatted in cUSD, e.g. "0.99" (null when unreadable). */
+  feeCusd?: string | null
+  /** Mint transaction Celoscan URL — "View tx" link. */
+  txUrl?: string | null
+}
+
+const STEP_LABELS: Record<MintStep, string> = {
+  idle: 'Mint boast',
+  signing: 'Signing run…',
+  approving: 'Approving cUSD…',
+  minting: 'Minting boast…',
 }
 
 export function BoastScreen({
@@ -15,26 +27,57 @@ export function BoastScreen({
   onShare,
   onDismiss,
   mintedId = null,
-  minting = false,
+  score = null,
+  mintStep = 'idle',
+  feeCusd = null,
+  txUrl = null,
 }: BoastScreenProps) {
+  const minting = mintStep !== 'idle'
+  const hasMinted = mintedId != null
+
   return (
-    <ArtScreen src={designArt.boast} alt="Boast your score">
-      {/* Boast CTA measured at 77.5–83%; Share ~86–90; Not Now ~92–96 */}
-      {mintedId == null ? (
-        <Hotspot
-          top={77.5}
-          left={20}
-          width={60}
-          height={6}
-          label={minting ? 'Saving boast…' : 'Save boast'}
+    <main className="built-screen boast-screen">
+      <header className="built-screen__header">
+        <button type="button" className="icon-button" onClick={onDismiss} aria-label="Close">×</button>
+        <div>
+          <p className="eyebrow">On-chain record</p>
+          <h1>Boast</h1>
+        </div>
+      </header>
+
+      <section className="boast-card">
+        <div className="boast-card__mark" aria-hidden>FR</div>
+        <p>Fruit Rush score</p>
+        <strong>{score != null ? score.toLocaleString() : 'New high score'}</strong>
+        {hasMinted ? (
+          <a
+            className="boast-card__verified boast-card__link"
+            href={txUrl ?? undefined}
+            target={txUrl ? '_blank' : undefined}
+            rel={txUrl ? 'noreferrer' : undefined}
+          >
+            {txUrl ? `Boast #${mintedId} · View tx` : `Minted · Boast #${mintedId}`}
+          </a>
+        ) : (
+          <span className="boast-card__verified">Verified run</span>
+        )}
+      </section>
+
+      <section className="boast-actions">
+        <button
+          type="button"
+          className="btn-primary"
           disabled={minting}
-          onClick={onMint}
-        />
-      ) : (
-        <Hotspot top={77.5} left={20} width={60} height={6} label="Share" onClick={onShare} />
-      )}
-      <Hotspot top={86} left={32} width={36} height={4.5} label="Share" onClick={onShare} />
-      <Hotspot top={92} left={32} width={36} height={4.5} label="Not now" onClick={onDismiss} />
-    </ArtScreen>
+          onClick={hasMinted ? onShare : onMint}
+        >
+          {hasMinted ? 'Share boast' : STEP_LABELS[mintStep]}
+        </button>
+        {!hasMinted && feeCusd && (
+          <p className="boast-actions__fee">Fee {feeCusd} cUSD + gas in CELO · saved forever on Celo</p>
+        )}
+        <button type="button" className="btn-secondary" onClick={onShare}>Share card</button>
+        <button type="button" className="btn-ghost" onClick={onDismiss}>{hasMinted ? 'Done' : 'Not now'}</button>
+      </section>
+    </main>
   )
 }

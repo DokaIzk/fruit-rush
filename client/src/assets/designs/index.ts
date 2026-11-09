@@ -1,4 +1,6 @@
 import homeArt from './home.webp'
+import woodBg from './wood-bg.jpeg'
+import logo from './logo.png'
 import modesArt from './modes.webp'
 import playArt from './play.webp'
 import shopArt from './shop.webp'
@@ -27,3 +29,9 @@ export const designArt = {
 } as const
 
 export type DesignScreen = keyof typeof designArt
+
+/** UI background textures + marks used directly by rebuilt HTML screens. */
+export const uiArt = {
+  woodBg,
+  logo,
+} as const

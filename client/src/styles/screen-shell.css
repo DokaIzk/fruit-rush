@@ -1,0 +1,251 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared screen shell — one visual system for every non-game screen.
+   Screens set their own `--screen-bg` on the root (wood plank via uiArt).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.app-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px calc(96px + env(safe-area-inset-bottom, 0px));
+  background-image: var(--screen-bg);
+  background-size: cover;
+  background-position: center;
+  color: var(--cream);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.app-screen::-webkit-scrollbar { display: none; }
+.app-screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5,20,12,0.6), rgba(5,20,12,0.3) 40%, rgba(5,20,12,0.75));
+  pointer-events: none;
+  z-index: -1;
+}
+
+.app-screen__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  margin-bottom: 16px;
+  /* Clear the 52–58px settings/wallet chips pinned at the screen corners */
+  padding: 0 68px;
+}
+.app-screen__title {
+  margin: 0;
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--wood-edge);
+}
+.app-screen__eyebrow {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lime);
+}
+.app-screen__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(8, 20, 14, 0.85);
+  border: 1px solid var(--wood-edge);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--cream);
+  white-space: nowrap;
+}
+.app-screen__chip svg { color: var(--orange); }
+.app-screen__chip--gold { color: var(--gold); }
+
+.app-screen .wood-panel { color: var(--cream); }
+.app-screen .btn { width: 100%; }
+
+/* Shared header back button — 44px, sits in .app-screen__header */
+.round-btn--sm { width: 44px; height: 44px; }
+.round-btn--sm svg { width: 20px; height: 20px; }
+
+.app-screen h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
+/* Stat tile grids (profile etc.) */
+.tiles { display: grid; gap: 12px; }
+.tiles--2 { grid-template-columns: repeat(2, 1fr); }
+.tiles--3 { grid-template-columns: repeat(3, 1fr); }
+.tile { min-height: 84px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 12px; }
+.tile > span { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream-dim); }
+.tile > strong { font-family: var(--font-display); font-size: 1.25rem; text-transform: uppercase; }
+.tile > small { color: var(--cream-dim); font-size: 0.68rem; }
+
+/* Live indicator dot (Compete header chip) */
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 10px var(--lime);
+}
+
+/* Level progress bar */
+.xpbar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--wood-edge);
+  overflow: hidden;
+}
+.xpbar i { display: block; height: 100%; background: var(--lime); border-radius: inherit; }
+
+/* Section heading shared with tournament list / loadout */
+.app-screen .section-heading h2 { font-size: 1.2rem; }
+
+/* ── Connect-specific bits ──────────────────────────────────────────────── */
+/* ── Connect screen — centered stack ────────────────────────────────────── */
+.connect {
+  justify-content: center;
+}
+.connect__logo {
+  width: min(72%, 260px);
+  max-height: 40vh;
+  object-fit: contain;
+  display: block;
+  margin: 4px auto 4px;
+  filter: drop-shadow(0 4px 6px rgba(20, 10, 4, 0.55));
+}
+.connect__header { min-height: 0; justify-content: center; }
+.connect__header .app-screen__title { flex: 1; text-align: center; font-size: 1.7rem; }
+/* Keep the title on one line next to the header back button */
+.connect__header .app-screen__title { font-size: 1.45rem; line-height: 1.15; hyphens: none; }
+.connect__hint { margin: 0 0 20px; text-align: center; color: var(--cream-dim); font-size: 0.85rem; }
+
+/* ── Shared sign-in choice button (Connect screen + guest popover) ─────── */
+.connect-opts { display: flex; flex-direction: column; gap: 14px; }
+.connect-choice {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  text-align: left;
+  cursor: pointer;
+}
+.connect-choice__icon { display: grid; place-items: center; flex: none; }
+.connect-choice__icon svg { width: 20px; height: 20px; }
+.connect-choice__copy { display: flex; flex-direction: column; gap: 2px; }
+.connect-choice__title { font-family: var(--font-display); font-size: 1.05rem; text-transform: uppercase; }
+.connect-choice__sub { font-size: 0.72rem; color: var(--cream-dim); }
+/* Primary = same shell, only the background swaps to the orange gradient */
+.connect-choice--primary {
+  background: linear-gradient(180deg, #ffa54a, #ff6a10);
+  color: #14330f;
+}
+.connect-choice--primary .connect-choice__sub { color: rgba(20, 51, 15, 0.75); }
+.connect-choice:disabled { cursor: default; }
+
+.connect-choice:disabled { cursor: default; }
+
+.connect__fine { margin: 14px 0 0; color: var(--cream-dim); font-size: 0.72rem; line-height: 1.4; text-align: center; }
+
+/* Email / wallet panels share the same shell */
+.connect-panel { display: flex; flex-direction: column; gap: 14px; }
+.connect-panel__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(244, 239, 226, 0.25);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* Section heading shared by Compete / Profile */
+.section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.section-heading h2 { margin: 0; font-family: var(--font-display); font-size: 1rem; }
+.section-heading > span, .section-heading button { color: var(--cream-dim); font-size: 0.68rem; }
+.section-heading button { text-decoration: underline; cursor: pointer; }
+
+/* ── Connect choice list ───────────────────────────────────────────────── */
+.connect-opts { display: flex; flex-direction: column; gap: 14px; }
+
+/* ── Compete: featured card + upcoming rows ─────────────────────────────── */
+.tn-feature {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+.tn-feature__top {
+  display: flex;
+  justify-content: space-between;
+  color: var(--cream-dim);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.tn-feature h2 { font-size: 1.7rem; }
+.tn-feature .btn { margin-top: 4px; }
+.tn-feature .tile {
+  min-height: 0;
+  padding: 0;
+}
+.tn-feature .tile > strong { font-size: 0.9rem; }
+
+.tournament-list { display: flex; flex-direction: column; }
+.tn-row {
+  display: grid;
+  grid-template-columns: 1fr 74px 44px;
+  align-items: center;
+  gap: 8px;
+  min-height: 76px;
+  margin-bottom: 8px;
+  padding: 10px 8px 10px 14px;
+}
+.tn-row > div:first-child { display: flex; flex-direction: column; gap: 4px; }
+.tn-row > div:first-child strong { font-size: 0.95rem; }
+.tn-row > div:first-child span,
+.tn-row__pool span { color: var(--cream-dim); font-size: 0.62rem; }
+.tn-row__pool { display: flex; flex-direction: column; text-align: right; }
+.tn-row__pool strong { font-family: var(--font-display); }
+
+/* ── Profile: loadout rows ──────────────────────────────────────────────── */
+.profile-loadout { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.loadout-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
+  padding: 10px 16px;
+}
+.loadout-row small {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+}
+.loadout-row strong { font-family: var(--font-display); text-transform: uppercase; }
+.profile-loadout .section-heading { margin-bottom: 2px; }

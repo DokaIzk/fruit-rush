@@ -1,7 +1,6 @@
 import { audio } from '../audio'
-import { ArtScreen } from '../components/ArtScreen'
-import { Hotspot } from '../components/Hotspot'
-import { designArt } from '../assets/designs'
+import { uiArt } from '../assets/designs'
+import { ArrowLeft } from '../components/icons'
 import type { GameMode } from '../types/game'
 
 interface ModesScreenProps {
@@ -10,73 +9,59 @@ interface ModesScreenProps {
   onSelect: (mode: GameMode) => void
 }
 
-/**
- * Hotspots measured on modes.png with a 2% grid — they sit exactly on the
- * wooden planks (x 6–94%):
- *  Classic 35–50.5% · Zen 53–69% · Arcade 71–85.5%
- */
+const MODES: { mode: GameMode; title: string; rule: string }[] = [
+  { mode: 'Classic', title: 'Classic', rule: 'Endless · 3 lives · Bombs' },
+  { mode: 'Zen', title: 'Zen', rule: '90 seconds · No bombs' },
+  { mode: 'Arcade', title: 'Arcade', rule: '2 minutes · Frenzy' },
+]
+
 export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProps) {
   const pick = (mode: GameMode) => {
-    // Unlock inside the mode-tap gesture, fade menu → arena whoosh + ambience.
-    void audio.unlock().then(() => {
-      audio.enterGameplay()
-    })
+    void audio.unlock().then(() => audio.enterGameplay())
     onSelect(mode)
   }
 
   return (
-    <ArtScreen src={designArt.modes} alt="Choose your cut">
-          <Hotspot
-        top={2}
-        left={1}
-        width={14}
-        height={6}
-        label="Back"
-        silent
-        onClick={() => {
-          void audio.unlock().then(() => audio.playUi('close'))
-          onBack()
-        }}
-      />
+    <main className="modes-screen" style={{ backgroundImage: `url(${uiArt.woodBg})` }}>
+      <header className="app-screen__header">
+        <button
+          type="button"
+          className="round-btn round-btn--sm"
+          aria-label="Back"
+          onClick={() => {
+            void audio.unlock().then(() => audio.playUi('close'))
+            onBack()
+          }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <span className="app-screen__eyebrow">Choose a run</span>
+          <h1 className="app-screen__title">Choose your cut</h1>
+        </div>
+      </header>
 
-      <Hotspot
-        top={34}
-        left={5}
-        width={90}
-        height={15}
-        label="Classic — endless survival, bombs live"
-        onClick={() => pick('Classic')}
-      />
-      <Hotspot
-        top={51}
-        left={5}
-        width={90}
-        height={17}
-        label="Zen — 90 seconds, no bombs"
-        onClick={() => pick('Zen')}
-      />
-      <Hotspot
-        top={70}
-        left={5}
-        width={90}
-        height={16}
-        label="Arcade — frenzy with hazards"
-        onClick={() => pick('Arcade')}
-      />
-
-      {/* Correct the baked art subtitles (old art had Classic/Zen rules swapped). */}
-      <p className="modes-rule modes-rule--classic" aria-hidden>
-        Endless. Bombs live.
-      </p>
-      <p className="modes-rule modes-rule--zen" aria-hidden>
-        90 seconds. No bombs.
-      </p>
+      <div className="modes-screen__list">
+        {MODES.map((m) => (
+          <button
+            key={m.mode}
+            type="button"
+            className="wood-panel modes-screen__sign"
+            onClick={() => pick(m.mode)}
+          >
+            <div>
+              <h2 className="display">{m.title}</h2>
+              <span className="pill">{m.rule}</span>
+            </div>
+          </button>
+        ))}
+      </div>
 
       {guest && (
-        <div className="modes-guest-note" role="note">
-          Playing as guest — sign in to shop, compete, and keep rewards
-        </div>
+        <p className="modes-screen__guest" role="note">
+          Playing as guest. Sign in to shop, compete, and keep rewards.
+        </p>
       )}
-    </ArtScreen>
+    </main>
   )
 }

@@ -15,7 +15,13 @@ export function EmailAuthForm({ wallet, compact = false }: EmailAuthFormProps) {
   const busy = status === 'connecting'
   const emailBusy = busy && wallet.pendingWallet === 'Email'
 
-  if (!magicAvailable) return null
+  if (!magicAvailable) {
+    return (
+      <p className="wallet-options__error" role="alert">
+        Email sign-in is unavailable because the Magic publishable key is missing.
+      </p>
+    )
+  }
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -52,7 +58,7 @@ export function EmailAuthForm({ wallet, compact = false }: EmailAuthFormProps) {
       </div>
       <button
         type="submit"
-        className="btn-primary email-auth__continue"
+        className="btn btn--orange email-auth__continue"
         disabled={busy || !email.trim()}
       >
         {emailBusy ? 'Check your email…' : 'Continue with email'}

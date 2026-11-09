@@ -52,6 +52,11 @@ export interface WalletState {
   menuOpen: boolean
   /** True when opened inside MiniPay — connect is automatic, no picker. */
   inMiniPay: boolean
+  /**
+   * Active wagmi connector (null for Magic / guest sessions). Gives access to
+   * the wallet's EIP-1193 provider for on-chain writes via connector.getProvider().
+   */
+  connector: Connector | null
   connect: (option: WalletOption) => void
   /** Email OTP via Magic — provisions an embedded Celo wallet. */
   loginWithEmail: (email: string) => Promise<void>
@@ -239,6 +244,7 @@ export function useWalletImpl(): WalletState {
     error: combinedError,
     menuOpen,
     inMiniPay,
+    connector: wagmiConnected ? (account.connector ?? null) : null,
     connect,
     loginWithEmail,
     disconnect,

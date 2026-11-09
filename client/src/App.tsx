@@ -2,11 +2,22 @@ import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from
 import { audio } from './audio'
 import { PhoneStage } from './components/PhoneStage'
 import { WalletMenu } from './components/WalletMenu'
+import { Settings } from './components/icons'
 import type { GameEndPayload } from './game/types'
 import { LoadingScreen } from './screens/LoadingScreen'
 import { useWallet } from './state/useWallet'
-import { getMagicIdToken } from './auth/magicAuth'
+import { getMagicIdToken, getMagicBoastProvider } from './auth/magicAuth'
+import type { EIP1193Provider } from 'viem'
+import type { MintStep } from './screens/BoastScreen'
 import { signBoast, validateGameSession } from './api'
+import {
+  celoscanTxUrl,
+  describeBoastError,
+  formatCusd,
+  mintBoastOnChain,
+  readBoastFee,
+  type BoastSignature,
+} from './onchain/boast'
 import type { GameMode, GameSessionResult, ScreenId } from './types/game'
 
 /** Lazy screens — keep Pixi, shop, results, etc. out of the boot JS graph. */
@@ -147,7 +158,9 @@ export default function App() {
   const [lastResult, setLastResult] = useState<GameSessionResult | null>(null)
   const [personalBest, setPersonalBest] = useState(loadPersonalBest)
   const [mintedId, setMintedId] = useState<number | null>(null)
-  const [minting, setMinting] = useState(false)
+  const [mintStep, setMintStep] = useState<MintStep>('idle')
+  const [mintTxHash, setMintTxHash] = useState<string | null>(null)
+  const [boastFeeCusd, setBoastFeeCusd] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen)
   const [deepLink] = useState(pendingDeepLink)
@@ -156,6 +169,39 @@ export default function App() {
     setToast(message)
     window.setTimeout(() => setToast(null), 2200)
   }, [])
+
+  // Read the live boast fee whenever the boast screen is open.
+  useEffect(() => {
+    if (screen !== 'boast') return
+    let cancelled = false
+    readBoastFee()
+      .then((fee) => {
+        if (!cancelled) setBoastFeeCusd(formatCusd(fee))
+      })
+      .catch(() => {
+        if (!cancelled) setBoastFeeCusd(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [screen])
+
+  /** Resolve an EIP-1193 provider + sender account for on-chain writes. */
+  const resolveWriteProvider = useCallback(async (): Promise<{
+    provider: EIP1193Provider
+    account: `0x${string}`
+  } | null> => {
+    if (wallet.loginMethod === 'magic') {
+      const session = await getMagicBoastProvider()
+      if (!session) return null
+      return { provider: session.provider, account: session.address }
+    }
+    const { connector, address } = wallet
+    if (!connector || !address) return null
+    const provider = (await connector.getProvider()) as EIP1193Provider
+    return { provider, account: address as `0x${string}` }
+  }, [wallet])
+
 
   const { closeMenu } = wallet
 
@@ -342,6 +388,8 @@ export default function App() {
         inputEventLog: payload.inputEventLog,
       })
       setMintedId(null)
+      setMintStep('idle')
+      setMintTxHash(null)
 
       void getMagicIdToken().then((token) => {
         if (!token || (!wallet.address && wallet.status !== 'connected')) return
@@ -461,6 +509,12 @@ export default function App() {
             mode={mode}
             onExit={() => go('modes')}
             onEnded={handleGameEnd}
+            onRestart={() => {
+              // Reuses the existing remount key — no gameplay logic changes.
+              setPlayEpoch((n) => n + 1)
+              void audio.unlock().then(() => audio.enterGameplay())
+              go('play')
+            }}
           />
         </Lazy>
       )}
@@ -520,7 +574,10 @@ export default function App() {
         <Lazy>
           <BoastScreen
             mintedId={mintedId}
-            minting={minting}
+            score={lastResult.score}
+            mintStep={mintStep}
+            feeCusd={boastFeeCusd}
+            txUrl={mintTxHash ? celoscanTxUrl(mintTxHash) : null}
             onMint={async () => {
               if (!wallet.requireConnect()) {
                 showToast(saveProgressToast(wallet.inMiniPay))
@@ -535,15 +592,25 @@ export default function App() {
                 showToast('Email sign-in is required to save a boast')
                 return
               }
-              setMinting(true)
+              setMintStep('signing')
               try {
-                const result = await signBoast(token, lastResult.backendSessionId)
-                setMintedId(result.nonce)
-                showToast('Boast signature saved')
+                const sig: BoastSignature = await signBoast(token, lastResult.backendSessionId)
+                const walletSession = await resolveWriteProvider()
+                if (!walletSession) {
+                  throw new Error('Connect a wallet with cUSD to mint the boast')
+                }
+                const outcome = await mintBoastOnChain({
+                  provider: walletSession.provider,
+                  account: walletSession.account,
+                  sig,
+                  onStep: (step) => setMintStep(step),
+                })
+                setMintTxHash(outcome.txHash)
+                setMintedId(outcome.boastId ?? sig.nonce)
+                showToast('Boast minted on-chain 🎉')
               } catch (error) {
-                showToast(error instanceof Error ? error.message : 'Could not save boast')
-              } finally {
-                setMinting(false)
+                setMintStep('idle')
+                showToast(describeBoastError(error))
               }
             }}
             onShare={async () => {
@@ -583,14 +650,14 @@ export default function App() {
       {showSettingsChip && (
         <button
           type="button"
-          className="settings-chip"
+          className="round-btn settings-chip"
           aria-label="Settings"
           onClick={() => {
             void audio.unlock().then(() => audio.playUi('open'))
             openSettings()
           }}
         >
-          <span className="settings-chip__icon" aria-hidden />
+          <Settings size={20} />
         </button>
       )}
 

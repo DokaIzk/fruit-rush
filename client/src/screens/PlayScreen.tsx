@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { audio } from '../audio'
+import { RoundButton } from '../components/RoundButton'
 import { FruitRushGame } from '../game/FruitRushGame'
 import type { GameEndPayload, GameHudState } from '../game/types'
 import { MODE_CONFIG, formatTimeLeft } from '../game/types'
@@ -28,6 +29,8 @@ interface PlayScreenProps {
   mode: GameMode
   onExit: () => void
   onEnded: (result: GameEndPayload) => void
+  /** Restart the run — App remounts this screen via its existing playEpoch key. */
+  onRestart?: () => void
 }
 
 const INITIAL_HUD: GameHudState = {
@@ -68,7 +71,7 @@ function roundBlurb(mode: GameMode): { info: string; hint: string } {
   }
 }
 
-export const PlayScreen = memo(function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
+export const PlayScreen = memo(function PlayScreen({ mode, onExit, onEnded, onRestart }: PlayScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<FruitRushGame | null>(null)
   const cfg = MODE_CONFIG[mode]
@@ -262,35 +265,79 @@ export const PlayScreen = memo(function PlayScreen({ mode, onExit, onEnded }: Pl
 
       {paused && (
         <div className="play-pause" role="dialog" aria-label="Game paused">
-          <span className="play-pause__title display">Paused</span>
-          <span className="play-pause__hint">
-            {mode === 'Zen'
-              ? 'Chill timed slice — no bombs or hazards.'
-              : mode === 'Classic'
-                ? 'Endless survival — watch the bombs.'
-                : 'Take a breath, then continue.'}
-          </span>
-          <div className="play-pause__actions">
+          <div className="wood-panel play-pause__board">
+            <span className="display play-pause__title">Pause</span>
+            <span className="play-pause__hint">
+              {mode === 'Zen'
+                ? 'Chill timed slice — no bombs or hazards.'
+                : mode === 'Classic'
+                  ? 'Endless survival — watch the bombs.'
+                  : 'Take a breath, then continue.'}
+            </span>
+            <RoundButton
+              variant="green"
+              label={musicOn ? 'Turn game music off' : 'Turn game music on'}
+              onClick={() => {
+                void audio.unlock().then(() => {
+                  const next = !audio.isMusicEnabled
+                  audio.setMusicEnabled(next)
+                  setMusicOn(next)
+                  if (next) audio.playTheme('gameplay', 300)
+                  else audio.playUi('tap')
+                })
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {musicOn ? (
+                  <>
+                    <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" />
+                    <path d="M16.5 8.5a5 5 0 010 7" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" />
+                    <path d="M16 9l5 6M21 9l-5 6" />
+                  </>
+                )}
+              </svg>
+            </RoundButton>
             <button
               type="button"
-              className="play-pause__btn play-pause__btn--primary"
+              className="btn btn--green play-pause__resume"
               onClick={() => {
                 void audio.unlock().then(() => audio.playUi('press'))
                 gameRef.current?.resume()
               }}
             >
-              Continue
+              Resume
             </button>
-            <button
-              type="button"
-              className="play-pause__btn"
-              onClick={() => {
-                audio.playUi('close')
-                onExit()
-              }}
-            >
-              Exit to modes
-            </button>
+            <div className="play-pause__row">
+              <RoundButton
+                variant="red"
+                label="Restart run"
+                onClick={() => {
+                  audio.playUi('press')
+                  onRestart?.()
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 12a8 8 0 11-2.3-5.6" />
+                  <path d="M20 3v4h-4" />
+                </svg>
+              </RoundButton>
+              <RoundButton
+                variant="red"
+                label="Exit to modes"
+                onClick={() => {
+                  audio.playUi('close')
+                  onExit()
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </RoundButton>
+            </div>
           </div>
         </div>
       )}

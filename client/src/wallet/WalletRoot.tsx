@@ -27,6 +27,7 @@ function createStubWallet(): WalletState {
     error: null,
     menuOpen: false,
     inMiniPay: false,
+    connector: null,
     connect: noop,
     loginWithEmail: async () => {},
     disconnect: noop,

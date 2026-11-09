@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { audio } from '../audio'
-import { designArt } from '../assets/designs'
+import { RoundButton } from '../components/RoundButton'
 import {
   computeRoundRewards,
-  headlineFor,
   type RoundRewards,
 } from '../components/results/resultsRewards'
 import { fetchLeaderboard } from '../data/leaderboard'
@@ -44,7 +43,6 @@ export function ResultsScreen({
   onHome,
 }: ResultsScreenProps) {
   const [youRank, setYouRank] = useState(99)
-  const headline = headlineFor(result)
 
   useEffect(() => {
     let cancelled = false
@@ -103,20 +101,11 @@ export function ResultsScreen({
 
   return (
     <section className="rs-screen">
-      <img
-        className="rs-screen__art"
-        src={designArt.modes}
-        alt=""
-        draggable={false}
-        aria-hidden
-      />
-      <span className="rs-screen__scrim" aria-hidden />
+      <div className="wood-panel rs-card">
+        <span className="pill">{result.mode}</span>
+        <h2 className="display rs-card__title">Run complete</h2>
 
-      <div className="rs-card">
-        <p className="rs-card__mode">{result.mode}</p>
-        <h2 className="rs-card__title">{headline}</h2>
-
-        <p className="rs-card__score">{result.score.toLocaleString()}</p>
+        <p className="display rs-card__score">{result.score.toLocaleString()}</p>
         <p className={`rs-card__pb${result.isPersonalBest ? '' : ' is-dim'}`}>
           {result.isPersonalBest ? 'Personal best' : `Best ${personalBest.toLocaleString()}`}
         </p>
@@ -162,7 +151,7 @@ export function ResultsScreen({
         <div className="rs-card__actions">
           <button
             type="button"
-            className="btn-primary"
+            className="btn btn--green"
             onClick={() => {
               audio.playUi('press')
               void audio.unlock().then(() => audio.enterGameplay())
@@ -174,7 +163,7 @@ export function ResultsScreen({
           {result.score > 0 && (
             <button
               type="button"
-              className="btn-secondary"
+              className="btn btn--orange rs-card__boast"
               onClick={() => {
                 audio.playUi('reward')
                 onBoast()
@@ -183,16 +172,20 @@ export function ResultsScreen({
               Boast it
             </button>
           )}
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => {
-              audio.playUi('close')
-              onHome()
-            }}
-          >
-            Home
-          </button>
+          <div className="rs-card__round">
+            <RoundButton
+              variant="red"
+              label="Exit to home"
+              onClick={() => {
+                audio.playUi('close')
+                onHome()
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </RoundButton>
+          </div>
         </div>
       </div>
     </section>

@@ -17,7 +17,7 @@ export const COSMETICS: CosmeticItem[] = [
     owned: true,
     equipped: true,
     blurb: 'Light orchard steel. Clean arcs.',
-    accent: '#c9c0b0',
+    accent: 'var(--rarity-common)',
   },
   {
     id: 'knife-ember',
@@ -27,7 +27,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 2.99,
     owned: false,
     blurb: 'Warm citrus trail on every cut.',
-    accent: '#ff6b1a',
+    accent: 'var(--rarity-rare)',
   },
   {
     id: 'knife-dragon',
@@ -37,7 +37,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 9.99,
     owned: false,
     blurb: 'Season zero legend. Gold-lined steel.',
-    accent: '#f0c75e',
+    accent: 'var(--rarity-legendary)',
   },
   {
     id: 'fruit-classic',
@@ -48,7 +48,7 @@ export const COSMETICS: CosmeticItem[] = [
     owned: true,
     equipped: true,
     blurb: 'Watermelon, mango, lime — the originals.',
-    accent: '#c8f542',
+    accent: 'var(--accent-lime)',
   },
   {
     id: 'fruit-neon',
@@ -58,7 +58,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 4.99,
     owned: false,
     blurb: 'High-contrast skins for night runs.',
-    accent: '#e63946',
+    accent: 'var(--rarity-epic)',
   },
   {
     id: 'trail-silver',
@@ -68,7 +68,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 1.99,
     owned: false,
     blurb: 'Crisp blade ribbon. Low glare.',
-    accent: '#f4ede0',
+    accent: 'var(--rarity-rare)',
   },
   {
     id: 'trail-citrus',
@@ -78,7 +78,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 3.99,
     owned: false,
     blurb: 'Tangerine afterimage on every slash.',
-    accent: '#ff6b1a',
+    accent: 'var(--rarity-epic)',
   },
   {
     id: 'bg-dojo',
@@ -88,7 +88,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 2.49,
     owned: false,
     blurb: 'Lantern mist over the orchard floor.',
-    accent: '#145239',
+    accent: 'var(--rarity-rare)',
   },
   {
     id: 'bg-market',
@@ -98,7 +98,7 @@ export const COSMETICS: CosmeticItem[] = [
     priceCusd: 7.99,
     owned: false,
     blurb: 'Crowded stalls, warm spill light.',
-    accent: '#f0c75e',
+    accent: 'var(--rarity-legendary)',
   },
 ]
 
@@ -146,8 +146,8 @@ export const TOURNAMENTS: TournamentInfo[] = [
 ]
 
 export const RARITY_COLOR: Record<string, string> = {
-  Common: '#c9c0b0',
-  Rare: '#3db8a0',
-  Epic: '#ff6b1a',
-  Legendary: '#f0c75e',
+  Common: 'var(--rarity-common)',
+  Rare: 'var(--rarity-rare)',
+  Epic: 'var(--rarity-epic)',
+  Legendary: 'var(--rarity-legendary)',
 }

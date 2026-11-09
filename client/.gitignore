@@ -30,3 +30,5 @@ src/assets/**/_png_source/
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*

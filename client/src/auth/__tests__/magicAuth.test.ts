@@ -79,8 +79,15 @@ describe('magicAuth', () => {
   it('reports configured when publishable key is set', () => {
     expect(isMagicConfigured()).toBe(true)
     vi.stubEnv('VITE_MAGIC_PUBLISHABLE_KEY', '')
+    vi.stubEnv('VITE_MAGIC_PUBLIC_KEY', '')
     __resetMagicForTests()
     expect(isMagicConfigured()).toBe(false)
+  })
+
+  it('supports the legacy Magic public-key variable', () => {
+    vi.stubEnv('VITE_MAGIC_PUBLISHABLE_KEY', '')
+    vi.stubEnv('VITE_MAGIC_PUBLIC_KEY', 'pk_test_legacy')
+    expect(isMagicConfigured()).toBe(true)
   })
 
   it('loginWithEmail returns address, DID token, and provider', async () => {

@@ -1,6 +1,7 @@
-import { ArtScreen } from '../components/ArtScreen'
-import { Hotspot } from '../components/Hotspot'
-import { designArt } from '../assets/designs'
+import { uiArt } from '../assets/designs'
+import { Flame } from '../components/icons'
+import shopIcon from '../assets/icons/shop.png'
+import competeIcon from '../assets/icons/compete.png'
 
 interface HomeScreenProps {
   onPlay: () => void
@@ -8,25 +9,35 @@ interface HomeScreenProps {
   onCompete: () => void
 }
 
-/**
- * Hotspots measured on home.png with a 2% grid:
- *  - PLAY button: 71–83.5% tall, 29–73% wide
- *  - "Shop · Tournaments" text row: 85.5–88% (thumb-padded below)
- */
 export function HomeScreen({ onPlay, onShop, onCompete }: HomeScreenProps) {
   return (
-    <ArtScreen src={designArt.home} alt="Fruit Rush home">
-      <Hotspot top={71} left={28} width={46} height={12.5} label="Play" onClick={onPlay} />
+    <main className="home-screen" style={{ backgroundImage: `url(${uiArt.woodBg})` }}>
+      <header className="home-screen__top">
+        <div className="app-screen__chip" aria-label="Current streak: 3 days">
+          <Flame size={14} /> 3 day streak
+        </div>
+        <div className="app-screen__chip app-screen__chip--gold">2322</div>
+      </header>
 
-      <Hotspot top={84.5} left={29} width={14} height={5} label="Shop" onClick={onShop} />
-      <Hotspot
-        top={84.5}
-        left={44}
-        width={26}
-        height={5}
-        label="Tournaments"
-        onClick={onCompete}
-      />
-    </ArtScreen>
+      <img className="home-screen__logo" src={uiArt.logo} alt="Fruit Rush" />
+      <p className="home-screen__tagline">Slice. Score. Own it on Celo.</p>
+
+      <button type="button" className="btn btn--orange home-screen__play" onClick={onPlay}>
+        Play now
+      </button>
+
+      <div className="home-screen__tiles">
+        <button type="button" className="wood-panel home-screen__tile" onClick={onShop}>
+          <img src={shopIcon} alt="" className="home-screen__tile-icon" />
+          <span className="home-screen__kicker">Armory</span>
+          <strong className="display">Shop</strong>
+        </button>
+        <button type="button" className="wood-panel home-screen__tile" onClick={onCompete}>
+          <img src={competeIcon} alt="" className="home-screen__tile-icon" />
+          <span className="home-screen__kicker">Live</span>
+          <strong className="display">Compete</strong>
+        </button>
+      </div>
+    </main>
   )
 }

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { ConnectChoice } from './ConnectChoice'
+import { ArrowLeft, Mail, WalletIcon } from './icons'
 import { EmailAuthForm } from './EmailAuthForm'
 import { WalletOptions } from './WalletOptions'
 import type { WalletState } from '../state/useWallet'
@@ -52,7 +54,7 @@ export function WalletMenu({ wallet, className = '' }: WalletMenuProps) {
     <div className={`wallet-anchor ${className}`.trim()}>
       <button
         type="button"
-        className={`wallet-chip-btn${status === 'connected' ? ' is-connected' : ''}${status === 'connecting' ? ' is-busy' : ''}`}
+        className={`round-btn wallet-chip-btn${status === 'connected' ? ' is-connected' : ''}${status === 'connecting' ? ' is-busy' : ''}`}
         aria-haspopup="dialog"
         aria-expanded={menuOpen}
         aria-label={
@@ -65,7 +67,7 @@ export function WalletMenu({ wallet, className = '' }: WalletMenuProps) {
         onClick={handleToggle}
       >
         <span className="wallet-chip-btn__icon" aria-hidden>
-          {status === 'connecting' ? '…' : short ? short : '◈'}
+          {status === 'connecting' ? '…' : short ? short : <WalletIcon size={20} />}
         </span>
       </button>
 
@@ -77,7 +79,7 @@ export function WalletMenu({ wallet, className = '' }: WalletMenuProps) {
             aria-label="Close account menu"
             onClick={handleClose}
           />
-          <div className="wallet-popover" role="dialog" aria-label="Account">
+          <div className="wood-panel wallet-popover" role="dialog" aria-label="Account">
             {status !== 'connected' && !inMiniPay && (
               <>
                 {panel === 'email' ? (
@@ -88,7 +90,7 @@ export function WalletMenu({ wallet, className = '' }: WalletMenuProps) {
                       onClick={() => setPanel('choices')}
                       disabled={busy && wallet.pendingWallet === 'Email'}
                     >
-                      ← Back
+                      <ArrowLeft size={20} /> Back
                     </button>
                     <EmailAuthForm wallet={wallet} compact />
                   </div>
@@ -100,40 +102,35 @@ export function WalletMenu({ wallet, className = '' }: WalletMenuProps) {
                       onClick={() => setPanel('choices')}
                       disabled={busy}
                     >
-                      ← Back
+                      <ArrowLeft size={20} /> Back
                     </button>
                     <p className="wallet-popover__section">Choose a wallet</p>
                     <WalletOptions wallet={wallet} />
                   </div>
                 ) : (
                   <>
-                    <p className="wallet-popover__title">Save your progress</p>
+                    <p className="wallet-popover__title display">Save your progress</p>
                     <p className="wallet-popover__hint">
                       Sign in with email or connect a wallet.
                     </p>
-                    <div className="connect-choices">
+                    <div className="connect-opts">
                       {magicAvailable && (
-                        <button
-                          type="button"
-                          className="connect-choice connect-choice--primary"
+                        <ConnectChoice
+                          primary
                           disabled={busy}
+                          icon={<Mail size={20} />}
+                          title="Continue with email"
+                          sub="Create a secure wallet automatically"
                           onClick={() => setPanel('email')}
-                        >
-                          <span className="connect-choice__title">Continue with email</span>
-                          <span className="connect-choice__sub">
-                            Create a secure wallet automatically
-                          </span>
-                        </button>
+                        />
                       )}
-                      <button
-                        type="button"
-                        className="connect-choice"
+                      <ConnectChoice
                         disabled={busy}
+                        icon={<WalletIcon size={20} />}
+                        title="Connect wallet"
+                        sub="MetaMask and other browsers"
                         onClick={() => setPanel('wallet')}
-                      >
-                        <span className="connect-choice__title">Connect wallet</span>
-                        <span className="connect-choice__sub">MetaMask and other browsers</span>
-                      </button>
+                      />
                     </div>
                   </>
                 )}

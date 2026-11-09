@@ -1,0 +1,193 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Fruit Rush theme — pure CSS, no image assets.
+   Imported first (before fonts/global) in src/main.tsx.
+   Shared vars live here; tokens.css aliases into them (never redefines them).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Lilita+One&family=Inter:wght@400;600;700;800&display=swap');
+
+:root {
+  /* Surfaces */
+  --forest-1: #0f2a1c;
+  --forest-2: #07140f;
+
+  /* Wood */
+  --wood-light: #9a6436;
+  --wood-dark: #4a2a14;
+  --wood-edge: #2a1608;
+
+  /* Accents */
+  --lime: #c8f04a;
+  --orange: #ff7a1a;
+  --red: #e0432a;
+  --green-btn: #5cc23a;
+
+  /* Text */
+  --cream: #f4efe2;
+  --cream-dim: #b9b29f;
+
+  /* Type */
+  --font-display: 'Lilita One', Impact, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  /* Rarity (used by .ribbon via --c) */
+  --rarity-common: #cfcfcf;
+  --rarity-rare: #4fd1a5;
+  --rarity-epic: #ff6b4a;
+  --rarity-legendary: #f2c94c;
+}
+
+body {
+  background: var(--forest-2);
+  color: var(--cream);
+  font-family: var(--font-body);
+}
+
+/* ── Display type ────────────────────────────────────────────────────────── */
+
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  color: var(--cream);
+  text-shadow: 0 3px 0 var(--wood-edge);
+  font-weight: 400; /* Lilita One has a single weight */
+  letter-spacing: 0.02em;
+}
+
+/* ── Wood panel ──────────────────────────────────────────────────────────── */
+
+.wood-panel {
+  border-radius: 18px;
+  padding: 16px;
+  border: 3px solid var(--wood-edge);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 26%),
+    linear-gradient(175deg, var(--wood-light), var(--wood-dark));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.16),
+    0 6px 0 var(--wood-edge),
+    0 14px 30px rgba(0, 0, 0, 0.38);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  --c1: var(--green-btn);
+  --c2: #4fb22c;
+  --c3: #2a6b14;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 0 24px;
+  border-radius: 16px;
+  border: 3px solid var(--c3);
+  background: linear-gradient(180deg, var(--c1), var(--c2));
+  color: var(--cream);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 0 var(--c3);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 var(--c3);
+}
+
+.btn--orange {
+  --c1: #ffa54a;
+  --c2: #ff6a10;
+  --c3: #9a3a06;
+}
+
+.btn--red {
+  --c1: #ff6a55;
+  --c2: #d9301a;
+  --c3: #7a1404;
+}
+
+/* ── Round icon buttons ──────────────────────────────────────────────────── */
+
+.round-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--wood-edge);
+  background: radial-gradient(circle at 30% 25%, #ff8a72, var(--red) 62%);
+  color: var(--cream);
+  box-shadow: 0 4px 0 var(--wood-edge);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.round-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--wood-edge);
+}
+
+.round-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.round-btn--green {
+  background: radial-gradient(circle at 30% 25%, #b6f06e, var(--green-btn) 62%);
+  color: #14330f;
+}
+
+/* ── Pills ───────────────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: #14330f;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Outlined pill variant (shop filter inactive) */
+.pill--ghost {
+  background: transparent;
+  color: var(--cream-dim);
+  border: 1.5px solid rgba(244, 239, 226, 0.25);
+}
+
+/* ── Ribbon (corner tag) ─────────────────────────────────────────────────── */
+
+.ribbon {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  padding: 4px 12px 4px 8px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%);
+  background: var(--c, var(--lime));
+  color: #14330f;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rarity-common { --c: var(--rarity-common); }
+.rarity-rare { --c: var(--rarity-rare); }
+.rarity-epic { --c: var(--rarity-epic); }
+.rarity-legendary { --c: var(--rarity-legendary); }

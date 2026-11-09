@@ -1,21 +1,42 @@
 :root {
-  --ink: #0b1f17;
-  --ink-elevated: #102820;
-  --teal-dusk: #0d3b2e;
-  --teal-mid: #145239;
-  --tangerine: #ff6b1a;
-  --tangerine-deep: #e2550a;
-  --lime: #c8f542;
-  --lime-dim: #9bc22e;
-  --watermelon: #e63946;
-  --gold: #f0c75e;
-  --cream: #f4ede0;
-  --cream-dim: #c9c0b0;
-  --mist: rgba(244, 237, 224, 0.08);
-  --line: rgba(244, 237, 224, 0.14);
+  /*
+    Alias layer — the single source of truth for colors/type now lives in
+    theme.css (imported first in main.tsx). Vars ONLY defined here are the
+    extras the legacy screens still need. Never redefine a theme var.
+  */
+  /* Surfaces */
+  --bg-deep: var(--forest-2);
+  --bg-panel: var(--forest-1);
+  --bg-panel-raised: #16402c;
+  --border-subtle: rgba(200, 230, 150, 0.14);
 
-  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesk', system-ui, sans-serif;
-  --font-body: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
+  /* Text aliases → theme */
+  --text-primary: var(--cream);
+  --text-muted: var(--cream-dim);
+
+  /* Accents aliases → theme */
+  --accent-lime: var(--lime);
+  --accent-orange: var(--orange);
+  --accent-orange-deep: #d9500f;
+
+  /* Shape */
+  --radius-card: 18px;
+  --radius-pill: 999px;
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-button: 0 6px 0 var(--accent-orange-deep), 0 10px 20px rgba(255, 122, 26, 0.35);
+
+  /* Compatibility aliases for existing components */
+  --ink: var(--bg-deep);
+  --ink-elevated: var(--bg-panel);
+  --teal-dusk: var(--bg-panel);
+  --teal-mid: var(--bg-panel-raised);
+  --tangerine: var(--orange);
+  --tangerine-deep: var(--accent-orange-deep);
+  --lime-dim: var(--rarity-common);
+  --watermelon: var(--rarity-epic);
+  --gold: var(--rarity-legendary);
+  --mist: var(--border-subtle);
+  --line: var(--border-subtle);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
