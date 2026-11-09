@@ -877,6 +877,14 @@ img {
   min-height: 1.2em;
 }
 
+/* Startup config error (BootGate) — reuses the loading screen shell verbatim */
+.loading-screen__error {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: #ff9d7a;
+  white-space: pre-line;
+}
+
 .loading-screen__track {
   width: 100%;
   height: 4px;

@@ -1,8 +1,25 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Production builds must target the Render API — fail fast and loudly
+  // instead of shipping a silent localhost fallback.
+  const rawApiUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL?.trim() ?? ''
+  if (mode === 'production' && !rawApiUrl) {
+    throw new Error(
+      '[fruit-rush] Refusing production build: VITE_API_URL is missing. ' +
+        'Set it in Vercel (or the shell) to the Render backend URL, e.g. https://fruit-rush.onrender.com',
+    )
+  }
+  if (mode === 'production' && /localhost|127\.0\.0\.1/i.test(rawApiUrl)) {
+    throw new Error(
+      '[fruit-rush] Refusing production build: VITE_API_URL points at localhost (' + rawApiUrl + '). ' +
+        'Use the Render backend URL in production.',
+    )
+  }
+
+  return {
   plugins: [
     react(),
     VitePWA({
@@ -97,4 +114,5 @@ export default defineConfig({
     host: true,
     port: 5173,
   },
+  }
 })
