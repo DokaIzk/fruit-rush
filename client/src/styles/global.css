@@ -1257,6 +1257,15 @@ img {
   flex: 1;
 }
 
+/* WalletConnect row hint — "QR code / deep link" (muted, matches connect-panel copy) */
+.wallet-option__hint {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(244, 239, 226, 0.55);
+  flex: none;
+}
+
 .wallet-option__spinner {
   width: 16px;
   height: 16px;

@@ -1,3 +1,4 @@
+import { hasWalletConnectProjectId, openWalletConnectModal } from '../wallet/config'
 import type { WalletState } from '../state/useWallet'
 
 interface WalletOptionsProps {
@@ -11,9 +12,18 @@ interface WalletOptionsProps {
 export function WalletOptions({ wallet }: WalletOptionsProps) {
   const { options, connect, status, pendingWallet, error, inMiniPay } = wallet
 
+  // Coinbase / Base announce a connector even with no wallet installed —
+  // those are QR / deep-link options, not an installed injected wallet.
+  const hasInjectedConnector = options.some(
+    (o) =>
+      o.connector.type === 'injected' &&
+      o.connector.id !== 'injected' &&
+      !/coinbase|base/i.test(o.connector.id),
+  )
+
   if (inMiniPay) return null
 
-  if (options.length === 0) {
+  if (options.length === 0 && !hasWalletConnectProjectId) {
     return (
       <p className="wallet-options__empty">
         No browser wallet found. For the smoothest Celo play, open Fruit Rush inside{' '}
@@ -45,6 +55,16 @@ export function WalletOptions({ wallet }: WalletOptionsProps) {
           )}
         </button>
       ))}
+
+      {hasWalletConnectProjectId && !hasInjectedConnector && (
+        <button type="button" className="wallet-option" onClick={openWalletConnectModal}>
+          <span className="wallet-option__icon wallet-option__icon--fallback" aria-hidden>
+            Ξ
+          </span>
+          <span className="wallet-option__name">WalletConnect</span>
+          <span className="wallet-option__hint">QR code / deep link</span>
+        </button>
+      )}
 
       {status === 'connecting' && pendingWallet && pendingWallet !== 'Email' && (
         <p className="wallet-options__status">Approve in {pendingWallet}…</p>

@@ -133,8 +133,15 @@ export function useWalletImpl(): WalletState {
     // Wallets discovered via EIP-6963 announce themselves individually;
     // hide the generic "injected" fallback when any were found.
     const discovered = connectors.filter((c) => c.type === 'injected' && c.id !== 'injected')
+    // WalletConnect draws its own "WalletConnect" row in the picker
+    // (opens the Reown modal) — never list it alongside injected wallets.
+    // AppKit's "AUTH" connector would duplicate Magic email sign-in.
     return connectors
-      .filter((c) => (c.id === 'injected' ? discovered.length === 0 : true))
+      .filter(
+        (c) =>
+          (c.id === 'injected' ? discovered.length === 0 : true) &&
+          !/^(walletconnect|auth)$/i.test(c.type),
+      )
       .map((c) => ({
         id: c.id,
         name: c.id === 'injected' ? 'Browser account' : friendlyWalletName(c.name),
