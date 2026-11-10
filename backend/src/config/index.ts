@@ -48,13 +48,19 @@ const ConfigSchema = z.object({
   TOURNAMENT_OPERATOR_PRIVATE_KEY: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
   TOURNAMENT_CONTRACT_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
   CELO_RPC_URL: z.string().url(),
-  TOURNAMENT_FAILURE_WEBHOOK_URL: z.string().url().optional(),
+  TOURNAMENT_FAILURE_WEBHOOK_URL: z.preprocess(
+    v => (typeof v === 'string' && v.trim() ? v : undefined),
+    z.string().url().optional(),
+  ),
 
   // Public site URL — used when the backend constructs shareable links (e.g. /boast/:id).
   PUBLIC_APP_URL: z.string().url().default('https://fruit-rush.xyz'),
 
-  // Optional
-  SENTRY_DSN: z.string().url().optional(),
+  // Optional (empty values are treated as unset so .env.example templates are safe)
+  SENTRY_DSN: z.preprocess(
+    v => (typeof v === 'string' && v.trim() ? v : undefined),
+    z.string().url().optional(),
+  ),
 });
 
 // Parse and validate
