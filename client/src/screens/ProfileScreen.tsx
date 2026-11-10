@@ -1,6 +1,9 @@
 import { BottomNav } from '../components/BottomNav'
 import { FruitIcon } from '../components/FruitIcon'
 import { MOCK_PLAYER } from '../data/mock'
+import { useWallet } from '../state/useWallet'
+import { formatCusd } from '../onchain/boast'
+import { useCusdBalance } from '../onchain/useCusdBalance'
 import { uiArt } from '../assets/designs'
 import type { ScreenId } from '../types/game'
 import type { CSSProperties } from 'react'
@@ -13,6 +16,9 @@ interface ProfileScreenProps {
 const woodBg = { '--screen-bg': `url(${uiArt.woodBg})` } as CSSProperties
 
 export function ProfileScreen({ onPlay, onNavigate }: ProfileScreenProps) {
+  const wallet = useWallet()
+  const { cusdWei } = useCusdBalance(wallet.address)
+
   return (
     <main className="app-screen profile" style={woodBg}>
       <header className="app-screen__header">
@@ -20,7 +26,10 @@ export function ProfileScreen({ onPlay, onNavigate }: ProfileScreenProps) {
           <span className="app-screen__eyebrow">Player profile</span>
           <h1 className="app-screen__title">{MOCK_PLAYER.displayName}</h1>
         </div>
-        <span className="app-screen__chip app-screen__chip--gold">2322 ★</span>
+        {/* Real cUSD balance — the fake 2322 ★ is gone. Hidden until a wallet answers. */}
+        {cusdWei != null && (
+          <span className="app-screen__chip app-screen__chip--gold">{formatCusd(cusdWei)} ★</span>
+        )}
       </header>
 
       <section className="tiles tiles--2" aria-label="Progress">

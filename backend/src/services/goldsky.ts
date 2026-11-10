@@ -25,7 +25,7 @@ export async function hasBoastForScore(
 ): Promise<boolean> {
   const query = gql`
     query GetBoast($player: String!, $score: BigInt!, $gameMode: String!) {
-      boastMints(
+      boasts(
         where: {
           player: $player
           score: $score
@@ -50,9 +50,10 @@ export async function hasBoastForScore(
       gameMode,
     });
 
-    return data.boastMints && data.boastMints.length > 0;
+    return data.boasts && data.boasts.length > 0;
   } catch (error) {
-    console.error('Goldsky subgraph query failed:', error);
+    // One warning line, no stack — failures are non-fatal (fail open).
+    console.warn('Goldsky subgraph query failed:', error instanceof Error ? error.message : String(error));
     return false; // Fail open (assume no boast if query fails)
   }
 }
@@ -77,7 +78,7 @@ export async function getPlayerBoasts(
 > {
   const query = gql`
     query GetPlayerBoasts($player: String!, $limit: Int!) {
-      boastMints(
+      boasts(
         where: { player: $player }
         orderBy: score
         orderDirection: desc
@@ -97,14 +98,15 @@ export async function getPlayerBoasts(
       limit,
     });
 
-    return (data.boastMints || []).map((boast: any) => ({
+    return (data.boasts || []).map((boast: any) => ({
       boastId: boast.boastId,
       score: parseInt(boast.score),
       gameMode: boast.gameMode,
       timestamp: parseInt(boast.timestamp),
     }));
   } catch (error) {
-    console.error('Goldsky subgraph query failed:', error);
+    // One warning line, no stack — failures are non-fatal (fail open).
+    console.warn('Goldsky subgraph query failed:', error instanceof Error ? error.message : String(error));
     return [];
   }
 }
@@ -120,7 +122,7 @@ export async function batchCheckBoastStatus(
 ): Promise<Map<string, boolean>> {
   const query = gql`
     query BatchCheckBoasts($players: [String!]!) {
-      boastMints(where: { player_in: $players }, first: 1000) {
+      boasts(where: { player_in: $players }, first: 1000) {
         player
         score
         gameMode
@@ -130,6 +132,11 @@ export async function batchCheckBoastStatus(
 
   const result = new Map<string, boolean>();
 
+  // Nothing to look up — skip the subgraph round-trip entirely.
+  if (playerScores.length === 0) {
+    return result;
+  }
+
   try {
     const data: any = await client.request(query, {
       players: playerScores.map(p => p.playerAddress.toLowerCase()),
@@ -137,7 +144,7 @@ export async function batchCheckBoastStatus(
 
     // Build lookup set for faster checking
     const boastSet = new Set<string>();
-    (data.boastMints || []).forEach((boast: any) => {
+    (data.boasts || []).forEach((boast: any) => {
       const key = `${boast.player}-${boast.score}-${boast.gameMode}`;
       boastSet.add(key);
     });
@@ -148,7 +155,8 @@ export async function batchCheckBoastStatus(
       result.set(playerAddress, boastSet.has(key));
     });
   } catch (error) {
-    console.error('Goldsky batch query failed:', error);
+    // One warning line, no stack — failures are non-fatal (fail open).
+    console.warn('Goldsky batch query failed:', error instanceof Error ? error.message : String(error));
     // Fail open: mark all as no boast
     playerScores.forEach(({ playerAddress }) => {
       result.set(playerAddress, false);

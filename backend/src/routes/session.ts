@@ -15,6 +15,18 @@ import { storeSession } from '../services/supabase';
 const router = express.Router();
 
 /**
+ * One visibility line per validate request: method, path, origin, result.
+ * Kept to a single line so Render's log tail stays scannable.
+ */
+export function logValidateRequest(req: express.Request, summary: string): void {
+  const origin = (req.headers.origin ?? 'no-origin').slice(0, 64);
+  const player = typeof req.body?.playerId === 'string' ? req.body.playerId.slice(0, 10) : 'unknown';
+  console.log(
+    `[validate] ${req.method} ${req.originalUrl} origin=${origin} player=${player}… result=${summary}`,
+  );
+}
+
+/**
  * POST /session/validate
  * 
  * Validate a game session and store results.
@@ -32,6 +44,7 @@ router.post(
     const validationResult = GameSessionResultSchema.safeParse(req.body);
 
     if (!validationResult.success) {
+      logValidateRequest(req, 'REJECTED reason=schema');
       res.status(400).json({
         error: 'Validation error',
         details: validationResult.error.errors,
@@ -68,6 +81,10 @@ router.post(
     });
 
     // Return validation result
+    logValidateRequest(
+      req,
+      `${valid ? 'VALID' : 'INVALID'} serverScore=${serverScore} divergence=${divergence.toFixed(2)}%${rejectionReason ? ` reason=${rejectionReason}` : ''}`,
+    );
     res.json({
       valid,
       serverScore,

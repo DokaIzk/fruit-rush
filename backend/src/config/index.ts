@@ -50,6 +50,9 @@ const ConfigSchema = z.object({
   CELO_RPC_URL: z.string().url(),
   TOURNAMENT_FAILURE_WEBHOOK_URL: z.string().url().optional(),
 
+  // Public site URL — used when the backend constructs shareable links (e.g. /boast/:id).
+  PUBLIC_APP_URL: z.string().url().default('https://fruit-rush.xyz'),
+
   // Optional
   SENTRY_DSN: z.string().url().optional(),
 });
@@ -84,6 +87,7 @@ export const {
   TOURNAMENT_OPERATOR_PRIVATE_KEY,
   TOURNAMENT_CONTRACT_ADDRESS,
   CELO_RPC_URL,
+  PUBLIC_APP_URL,
   TOURNAMENT_FAILURE_WEBHOOK_URL,
   SENTRY_DSN,
 } = config;

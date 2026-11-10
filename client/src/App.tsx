@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { audio } from './audio'
 import { PhoneStage } from './components/PhoneStage'
 import { WalletMenu } from './components/WalletMenu'
@@ -54,6 +54,17 @@ const BoastScreen = lazy(() =>
 const TournamentScreen = lazy(() =>
   import('./screens/TournamentScreen').then((m) => ({ default: m.TournamentScreen })),
 )
+
+/** Shared public boast page — /boast/:id loads independently of the game shell. */
+const PublicBoastScreen = lazy(() =>
+  import('./screens/PublicBoastScreen').then((m) => ({ default: m.PublicBoastScreen })),
+)
+
+/** Matches `/boast/<id>` deep links (the in-game boast route is the bare `/boast`). */
+function parsePublicBoastId(pathname: string): string | null {
+  const match = /^\/boast\/([A-Za-z0-9_-]+)$/.exec(pathname)
+  return match ? match[1] : null
+}
 
 function ScreenFallback() {
   return <div className="screen-fallback" aria-hidden />
@@ -164,6 +175,12 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen)
   const [deepLink] = useState(pendingDeepLink)
+
+  /** `/boast/<id>` on a shared link — public record for that boast. */
+  const publicBoastId = useMemo(
+    () => parsePublicBoastId(window.location.pathname),
+    [],
+  )
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -409,6 +426,13 @@ export default function App() {
           accuracy: payload.accuracy,
           inputEventLog: payload.inputEventLog,
         }).then((validation) => {
+          // Validation visibility: log every call with its status and payload —
+          // the session/validate request is the anti-cheat contract with the
+          // backend, and silent failures made boast/leaderboard bugs opaque.
+          console.log(
+            `[validate] isValid=${validation.valid}${validation.rejectionReason ? ` reason=${validation.rejectionReason}` : ''}`,
+            validation,
+          )
           setLastResult((current) => current ? {
             ...current,
             backendSessionId: validation.sessionId,
@@ -418,6 +442,7 @@ export default function App() {
         }).catch((error: unknown) => {
           setLastResult((current) => current ? { ...current, backendValidation: 'unavailable' } : current)
           const message = error instanceof Error ? error.message : 'Backend unavailable'
+          console.log('[validate] request failed:', message)
           showToast(message)
         })
       })
@@ -439,6 +464,18 @@ export default function App() {
   const showSettingsChip =
     !settingsOpen &&
     (screen === 'home' || screen === 'profile' || screen === 'shop' || screen === 'tournaments')
+
+  // Shared boast links (/boast/:id) bypass the game shell entirely — the
+  // loader, onboarding, and connect screens never run for these visitors.
+  if (publicBoastId) {
+    return (
+      <PhoneStage>
+        <Lazy>
+          <PublicBoastScreen boastId={publicBoastId} />
+        </Lazy>
+      </PhoneStage>
+    )
+  }
 
   return (
     <PhoneStage>
@@ -614,7 +651,12 @@ export default function App() {
               }
             }}
             onShare={async () => {
-              const url = `https://fruitrush.gg/boast/${mintedId ?? 'demo'}`
+              // Only a minted boast has a public page /boast/<id>.
+              if (mintedId == null) {
+                showToast('Mint the boast to share it')
+                return
+              }
+              const url = `${import.meta.env.VITE_PUBLIC_APP_URL}/boast/${mintedId}`
               try {
                 if (navigator.share) {
                   await navigator.share({

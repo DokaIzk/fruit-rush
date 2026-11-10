@@ -93,19 +93,19 @@ describe('magicAuth', () => {
   it('loginWithEmail returns address, DID token, and provider', async () => {
     mockLoginWithEmailOTP.mockResolvedValue('did:token:abc')
     mockGetInfo.mockResolvedValue({
-      email: 'player@fruitrush.gg',
+      email: 'player@fruit-rush.xyz',
       wallets: { ethereum: { publicAddress: '0x1111111111111111111111111111111111111111' } },
     })
 
-    const session = await loginWithEmail('player@fruitrush.gg')
+    const session = await loginWithEmail('player@fruit-rush.xyz')
 
     expect(mockLoginWithEmailOTP).toHaveBeenCalledWith({
-      email: 'player@fruitrush.gg',
+      email: 'player@fruit-rush.xyz',
       showUI: true,
     })
     expect(session.address).toBe('0x1111111111111111111111111111111111111111')
     expect(session.token).toBe('did:token:abc')
-    expect(session.email).toBe('player@fruitrush.gg')
+    expect(session.email).toBe('player@fruit-rush.xyz')
     expect(session.provider).toBeTruthy()
   })
 
@@ -179,7 +179,7 @@ describe('magicAuth', () => {
     mockIsLoggedIn.mockResolvedValue(true)
     mockGetIdToken.mockResolvedValue('did:restored')
     mockGetInfo.mockResolvedValue({
-      email: 'back@fruitrush.gg',
+      email: 'back@fruit-rush.xyz',
       wallets: { ethereum: { publicAddress: '0x5555555555555555555555555555555555555555' } },
     })
 

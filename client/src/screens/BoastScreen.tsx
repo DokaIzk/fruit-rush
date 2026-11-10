@@ -1,3 +1,8 @@
+import { uiArt } from '../assets/designs'
+import { Close } from '../components/icons'
+import type { CSSProperties } from 'react'
+import '../styles/boast.css'
+
 export type MintStep = 'idle' | 'signing' | 'approving' | 'minting'
 
 interface BoastScreenProps {
@@ -36,47 +41,56 @@ export function BoastScreen({
   const hasMinted = mintedId != null
 
   return (
-    <main className="built-screen boast-screen">
-      <header className="built-screen__header">
-        <button type="button" className="icon-button" onClick={onDismiss} aria-label="Close">×</button>
-        <div>
-          <p className="eyebrow">On-chain record</p>
-          <h1>Boast</h1>
+    <main className="app-screen boast" style={{ '--screen-bg': `url(${uiArt.woodBg})` } as CSSProperties}>
+      <header className="app-screen__header">
+        <button type="button" className="round-btn" onClick={onDismiss} aria-label="Close">
+          <Close size={20} />
+        </button>
+        <div style={{ flex: 1 }}>
+          <span className="app-screen__eyebrow">On-chain record</span>
+          <h1 className="app-screen__title">Boast</h1>
         </div>
       </header>
 
-      <section className="boast-card">
-        <div className="boast-card__mark" aria-hidden>FR</div>
-        <p>Fruit Rush score</p>
-        <strong>{score != null ? score.toLocaleString() : 'New high score'}</strong>
+      <section className="wood-panel boast__card">
+        <img className="boast__logo" src={uiArt.logo} alt="Fruit Rush" />
+        <p className="boast__hint">Fruit Rush score</p>
+        <strong className="display boast__score">
+          {score != null ? score.toLocaleString() : 'New high score'}
+        </strong>
         {hasMinted ? (
           <a
-            className="boast-card__verified boast-card__link"
+            className="boast__verified"
             href={txUrl ?? undefined}
             target={txUrl ? '_blank' : undefined}
             rel={txUrl ? 'noreferrer' : undefined}
+            onClick={(e) => !txUrl && e.preventDefault()}
           >
             {txUrl ? `Boast #${mintedId} · View tx` : `Minted · Boast #${mintedId}`}
           </a>
         ) : (
-          <span className="boast-card__verified">Verified run</span>
+          <span className="boast__verified">Verified run</span>
         )}
       </section>
 
-      <section className="boast-actions">
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={minting}
-          onClick={hasMinted ? onShare : onMint}
-        >
-          {hasMinted ? 'Share boast' : STEP_LABELS[mintStep]}
-        </button>
-        {!hasMinted && feeCusd && (
-          <p className="boast-actions__fee">Fee {feeCusd} cUSD + gas in CELO · saved forever on Celo</p>
+      <section className="boast__actions">
+        {!hasMinted && (
+          <button type="button" className="btn btn--orange" disabled={minting} onClick={onMint}>
+            {STEP_LABELS[mintStep]}
+          </button>
         )}
-        <button type="button" className="btn-secondary" onClick={onShare}>Share card</button>
-        <button type="button" className="btn-ghost" onClick={onDismiss}>{hasMinted ? 'Done' : 'Not now'}</button>
+        {!hasMinted && feeCusd && (
+          <p className="boast__fee">Fee {feeCusd} cUSD + gas in CELO · saved forever on Celo</p>
+        )}
+        {hasMinted ? (
+          <button type="button" className="btn btn--orange" onClick={onShare}>
+            Share boast
+          </button>
+        ) : (
+          <button type="button" className="btn boast__share--locked" disabled>
+            Mint to share
+          </button>
+        )}
       </section>
     </main>
   )

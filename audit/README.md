@@ -287,7 +287,7 @@ We request the following deliverables:
 
 **Preferred Channels:**
 - **Slack:** `#security-audit` (fastest response)
-- **Email:** security@fruitrush.game (formal communication)
+- **Email:** security@fruit-rush.xyz (formal communication)
 - **Video Calls:** Weekly sync (scheduled via Calendly)
 
 **Response Time SLA:**
@@ -352,7 +352,7 @@ If you need clarification on any document or have questions during the audit:
 
 1. **Check the FAQ** (see below)
 2. **Ask in Slack** (`#security-audit`)
-3. **Email** security@fruitrush.game
+3. **Email** security@fruit-rush.xyz
 4. **Schedule a call** (Calendly link in email signature)
 
 ---
@@ -461,7 +461,7 @@ audit/
 
 For questions about this audit package:
 
-**Email:** security@fruitrush.game  
+**Email:** security@fruit-rush.xyz  
 **Slack:** `#security-audit`  
 **Response Time:** <4 hours (business hours)
 

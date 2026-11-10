@@ -17,12 +17,12 @@ info:
   version: 1.0.0
   contact:
     name: Fruit Rush Team
-    email: backend@fruitrush.game
+    email: backend@fruit-rush.xyz
 
 servers:
   - url: http://localhost:3000
     description: Local development
-  - url: https://api.fruitrush.game
+  - url: https://api.fruit-rush.xyz
     description: Production
 
 security:

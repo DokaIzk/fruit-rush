@@ -347,7 +347,7 @@ Results attached in `audit/checklist.md`.
 
 **Preferred Communication:**
 - **Slack:** `#security-audit` channel
-- **Email:** security@fruitrush.game
+- **Email:** security@fruit-rush.xyz
 - **Response Time:** <4 hours during business hours (9am–5pm UTC)
 
 ---

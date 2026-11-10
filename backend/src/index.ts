@@ -26,6 +26,51 @@ import { initializeScheduler } from './tournament/scheduler';
 const app = express();
 
 // ============================================================================
+// CORS — the public site is the only allowed origin set
+// ============================================================================
+const ALLOWED_ORIGINS = new Set([
+  'https://fruit-rush.xyz',
+  'https://www.fruit-rush.xyz',
+]);
+
+function resolveCorsOrigins(): string[] {
+  // '*' / empty means "not configured" — in production that is fatal.
+  if (NODE_ENV === 'production') {
+    if (CORS_ORIGINS === '*' || (Array.isArray(CORS_ORIGINS) && CORS_ORIGINS.length === 0)) {
+      console.error('Refusing to start: CORS_ORIGINS must list the production origins in NODE_ENV=production.');
+      console.error('Set CORS_ORIGINS=https://fruit-rush.xyz,https://www.fruit-rush.xyz');
+      process.exit(1);
+    }
+  }
+
+  const configured = CORS_ORIGINS === '*' ? ['*'] : CORS_ORIGINS;
+  if (NODE_ENV !== 'production') {
+    // Dev keeps whatever was configured (localhost:5173 etc.).
+    return configured.length > 0 ? configured : ['*'];
+  }
+
+  // Production: drop anything outside the public domains (one warning per drop).
+  const allowed: string[] = [];
+  for (const origin of configured) {
+    if (origin === '*') continue;
+    let host = '';
+    try {
+      host = new URL(origin).hostname;
+    } catch {
+      host = origin;
+    }
+    if (ALLOWED_ORIGINS.has(origin) || host === 'fruit-rush.xyz' || host === 'www.fruit-rush.xyz') {
+      allowed.push(origin);
+    } else {
+      console.warn(`[cors] dropping origin outside the public domain: ${origin}`);
+    }
+  }
+  return allowed;
+}
+
+const EFFECTIVE_CORS_ORIGINS = resolveCorsOrigins();
+
+// ============================================================================
 // Middleware
 // ============================================================================
 
@@ -35,7 +80,7 @@ app.use(helmet());
 // CORS
 app.use(
   cors({
-    origin: CORS_ORIGINS,
+    origin: EFFECTIVE_CORS_ORIGINS.length === 1 ? EFFECTIVE_CORS_ORIGINS[0] : EFFECTIVE_CORS_ORIGINS,
     credentials: true,
   })
 );

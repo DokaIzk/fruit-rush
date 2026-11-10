@@ -429,7 +429,7 @@ docker run -d \
 - [ ] Set `NODE_ENV=production`
 - [ ] Use strong `BOAST_SIGNER_PRIVATE_KEY` (32 bytes random)
 - [ ] Enable Redis TLS (`REDIS_TLS=true`)
-- [ ] Configure CORS origins (`CORS_ORIGINS=https://fruitrush.game`)
+- [ ] Configure CORS origins (`CORS_ORIGINS=https://fruit-rush.xyz`)
 - [ ] Set up log aggregation (Sentry DSN)
 - [ ] Use managed Redis (AWS ElastiCache, Redis Cloud)
 - [ ] Enable Supabase connection pooling

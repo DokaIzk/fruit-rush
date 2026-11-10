@@ -5,7 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig(({ mode }) => {
   // Production builds must target the Render API — fail fast and loudly
   // instead of shipping a silent localhost fallback.
-  const rawApiUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL?.trim() ?? ''
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const rawApiUrl = env.VITE_API_URL?.trim() ?? ''
   if (mode === 'production' && !rawApiUrl) {
     throw new Error(
       '[fruit-rush] Refusing production build: VITE_API_URL is missing. ' +
@@ -16,6 +17,21 @@ export default defineConfig(({ mode }) => {
     throw new Error(
       '[fruit-rush] Refusing production build: VITE_API_URL points at localhost (' + rawApiUrl + '). ' +
         'Use the Render backend URL in production.',
+    )
+  }
+
+  // Share links / public boast page derive from this — the only public domain.
+  const rawPublicUrl = env.VITE_PUBLIC_APP_URL?.trim() ?? ''
+  if (mode === 'production' && !rawPublicUrl) {
+    throw new Error(
+      '[fruit-rush] Refusing production build: VITE_PUBLIC_APP_URL is missing. ' +
+        'Set it to the public site URL, e.g. https://fruit-rush.xyz',
+    )
+  }
+  if (mode === 'production' && /localhost|127\.0\.0\.1/i.test(rawPublicUrl)) {
+    throw new Error(
+      '[fruit-rush] Refusing production build: VITE_PUBLIC_APP_URL points at localhost (' + rawPublicUrl + '). ' +
+        'Use the public site URL in production.',
     )
   }
 

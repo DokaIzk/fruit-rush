@@ -67,8 +67,7 @@ export function resolveBoastNetwork(): BoastNetwork {
   }
 }
 
-/** Celoscan link for a boast transaction. */
-export function celoscanTxUrl(txHash: string): string {
+/** Celoscan link for a boast transaction. */export function celoscanTxUrl(txHash: string): string {
   const { useMainnet } = resolveBoastNetwork()
   const base = useMainnet ? 'https://celoscan.io' : 'https://alfajores.celoscan.io'
   return `${base}/tx/${txHash}`
@@ -177,6 +176,18 @@ export async function readBoastFee(): Promise<bigint> {
     address: boastAddress,
     abi: BOAST_ABI,
     functionName: 'boastFee',
+  })
+}
+
+/** Read the player's cUSD balance (wei). Throws on RPC/network failure. */
+export async function readCusdBalance(account: `0x${string}`): Promise<bigint> {
+  const { chain, rpcUrl, cusdAddress } = resolveBoastNetwork()
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) })
+  return publicClient.readContract({
+    address: cusdAddress,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [account],
   })
 }
 

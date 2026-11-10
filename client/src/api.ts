@@ -88,6 +88,46 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+export interface PublicBoast {
+  boastId: string
+  playerAddress: string
+  score: number
+  gameMode: string
+  transactionHash: string
+  timestamp: number
+}
+
+/**
+ * GET /boast/:id — public record for a minted boast.
+ * Returns null when the boast does not exist (404) or the backend is
+ * unreachable — the public page renders "Boast not found" in both cases.
+ */
+export async function fetchPublicBoast(id: string): Promise<PublicBoast | null> {
+  try {
+    const response = await fetch(`${apiBaseUrl()}/boast/${encodeURIComponent(id)}`)
+    if (!response.ok) return null
+    const body = (await response.json()) as {
+      boastId: string
+      player: string
+      score: number
+      gameMode: string
+      transactionHash: string
+      timestamp: number
+    }
+    if (!body || body.boastId == null || !body.transactionHash) return null
+    return {
+      boastId: body.boastId,
+      playerAddress: body.player,
+      score: body.score,
+      gameMode: body.gameMode,
+      transactionHash: body.transactionHash,
+      timestamp: body.timestamp,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function validateGameSession(
   token: string,
   result: GameSessionResult & { inputEventLog: Array<{ t: number; x: number; y: number; velocity: number }> },

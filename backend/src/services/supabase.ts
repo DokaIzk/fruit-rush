@@ -98,6 +98,43 @@ export async function markSessionBoastSigned(sessionId: string, nonce: number): 
 }
 
 /**
+ * Get a single on-chain boast by id (public page  `GET /boast/:id`).
+ * Returns null when no record exists.
+ */
+export interface PublicBoastRecord {
+  boastId: string;
+  player: string;
+  score: number;
+  gameMode: string;
+  transactionHash: string;
+  timestamp: number;
+}
+
+export async function getBoastById(boastId: string): Promise<PublicBoastRecord | null> {
+  const { data, error } = await supabase
+    .from('boast_mints')
+    .select('boast_id, player_address, score, game_mode, transaction_hash, event_timestamp')
+    .eq('boast_id', boastId)
+    .limit(1);
+
+  if (error) {
+    throw new Error(`Failed to get boast: ${error.message}`);
+  }
+
+  const row = data?.[0];
+  if (!row) return null;
+
+  return {
+    boastId: String(row.boast_id),
+    player: row.player_address,
+    score: Number(row.score),
+    gameMode: row.game_mode,
+    transactionHash: row.transaction_hash,
+    timestamp: Number(row.event_timestamp),
+  };
+}
+
+/**
  * Get top 100 scores for a game mode (valid sessions only).
  */
 export async function getLeaderboard(gameMode: GameMode): Promise<Omit<LeaderboardEntry, 'hasBoast'>[]> {

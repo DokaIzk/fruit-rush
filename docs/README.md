@@ -179,7 +179,7 @@ For questions about documentation:
 
 - **Technical:** #backend-eng (Slack)
 - **Product:** #product (Slack)
-- **Security:** security@fruitrush.game
+- **Security:** security@fruit-rush.xyz
 
 ---
 

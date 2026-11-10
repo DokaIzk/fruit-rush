@@ -295,7 +295,7 @@ fruit-rush/
 - Database: #data-eng (Slack)
 
 **Security:**
-- Email: security@fruitrush.game
+- Email: security@fruit-rush.xyz
 - Slack: #security-audit
 
 **Documentation Issues:**

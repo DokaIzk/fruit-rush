@@ -190,7 +190,7 @@ SCORE_TOLERANCE_PCT=2.0
 SESSION_RATE_LIMIT=10
 
 # CORS
-CORS_ORIGINS=https://fruitrush.game
+CORS_ORIGINS=https://fruit-rush.xyz
 ```
 
 ### Optional (2 variables)

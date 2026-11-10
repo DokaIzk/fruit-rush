@@ -9,10 +9,45 @@ import { authMiddleware } from '../middleware/auth';
 import { boastRateLimit } from '../middleware/rateLimit';
 import { asyncHandler } from '../middleware/errorHandler';
 import { BoastSignatureRequestSchema } from '../schemas/validation';
-import { getSession, markSessionBoastSigned } from '../services/supabase';
+import { getSession, markSessionBoastSigned, getBoastById } from '../services/supabase';
 import { signBoast } from '../services/signer';
 
 const router = express.Router();
+
+/**
+ * GET /:id
+ *
+ * Public record for a minted boast — powers the shared /boast/:id page.
+ * Response: { boastId, player, score, gameMode, transactionHash, timestamp }
+ * 404 when the boast does not exist.
+ */
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const { id } = req.params as { id: string };
+
+    // Boast ids are sequential on-chain counters — numeric strings only.
+    if (!/^\d+$/.test(id)) {
+      res.status(404).json({
+        error: 'Boast not found',
+        message: `No on-chain record for boast ${id}`,
+      });
+      return;
+    }
+
+    const boast = await getBoastById(id);
+
+    if (!boast) {
+      res.status(404).json({
+        error: 'Boast not found',
+        message: `No on-chain record for boast ${id}`,
+      });
+      return;
+    }
+
+    res.json(boast);
+  })
+);
 
 /**
  * POST /boast/sign

@@ -307,7 +307,7 @@ Call backend after each game:
 
 ```typescript
 // After game ends
-const response = await axios.post('https://api.fruitrush.game/session/validate', {
+const response = await axios.post('https://api.fruit-rush.xyz/session/validate', {
   playerId: playerAddress,
   score: finalScore,
   gameMode: 'Classic',

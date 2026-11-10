@@ -331,7 +331,7 @@ You are a senior browser UI engineer. Your task is to build the cosmetic shop sc
 **B. Boast Screen (`BoastScreen.ts` + prefab):**
 1. Shown automatically when player beats their personal best in Classic or Arcade mode.
 2. Displays: score, combo high-water, game mode, date, and a rendered "Boast Card" (RenderTexture export as PNG for sharing).
-3. "Mint Boast" button → calls `IBoastService.MintBoast(sessionResult)` (interface stub); shows a loading spinner, then a success state with the on-chain boast ID and a copyable share URL `https://fruitrush.gg/boast/{boastId}`.
+3. "Mint Boast" button → calls `IBoastService.MintBoast(sessionResult)` (interface stub); shows a loading spinner, then a success state with the on-chain boast ID and a copyable share URL `https://fruit-rush.xyz/boast/{boastId}`.
 4. "Share" button → native share sheet (iOS/Android) or clipboard copy (WebGL).
 5. "Not Now" button to dismiss.
 
@@ -472,7 +472,7 @@ Build the following Node.js/TypeScript modules (can live in the same Express ser
 You are a senior full-stack TypeScript engineer. Your task is to build the web/PWA checkout flow for Fruit Rush — the mechanism that lets players buy cosmetics and boosts via a browser-based flow instead of native app-store IAP, preserving the studio's margin (avoiding 15–30% store fees).
 
 **Context:**
-When a player taps "Buy on Web" in the PWA shop, the game opens a deep link to `https://shop.fruitrush.gg/checkout?item={itemId}&playerId={address}&returnScheme=fruitrush://`. The player authenticates (Magic.link, already logged in via the game), approves a cUSD spend, the shop mints the item to their wallet, and the browser deep-links back to the game with a success/failure result.
+When a player taps "Buy on Web" in the PWA shop, the game opens a deep link to `https://shop.fruit-rush.xyz/checkout?item={itemId}&playerId={address}&returnScheme=fruitrush://`. The player authenticates (Magic.link, already logged in via the game), approves a cUSD spend, the shop mints the item to their wallet, and the browser deep-links back to the game with a success/failure result.
 
 **Task:**
 Build a Next.js 14 (App Router) PWA:

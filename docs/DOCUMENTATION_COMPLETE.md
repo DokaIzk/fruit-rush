@@ -349,7 +349,7 @@ db/
 
 **Documentation Questions:**
 - Slack: #engineering
-- Email: engineering@fruitrush.game
+- Email: engineering@fruit-rush.xyz
 
 **Found an Issue?**
 - Create GitHub issue with label `documentation`

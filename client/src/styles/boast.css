@@ -1,0 +1,133 @@
+/* Boast screen — carved-wood theme (matches the shared .app-screen shell) */
+
+.boast {
+  padding: 0 1.4rem calc(2rem + var(--safe-bottom));
+}
+
+/* Score plaque */
+.boast__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.2rem;
+  padding: 1.5rem 1.2rem 1.4rem;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.boast__logo {
+  width: 118px;
+  height: auto;
+  filter: drop-shadow(0 4px 6px rgba(20, 10, 4, 0.55));
+}
+
+.boast__hint {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244, 239, 226, 0.7);
+}
+
+.boast__score {
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--gold);
+  font-weight: 800;
+  text-shadow: 0 3px 0 var(--wood-edge);
+}
+
+.boast__verified {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lime, #8ee07a);
+  text-decoration: none;
+}
+
+.boast__verified:hover {
+  text-decoration: underline;
+}
+
+/* Actions */
+.boast__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.7rem;
+  margin-top: auto;
+}
+
+.boast__actions .btn {
+  width: 100%;
+}
+
+.boast__fee {
+  margin: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: rgba(244, 239, 226, 0.6);
+}
+
+/* Disabled share pill before a successful mint */
+.boast__share--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Public boast share page (/boast/:id)
+   ============================================================ */
+
+.public-boast__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+  padding: 1.6rem 1.3rem;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.public-boast__logo {
+  width: 132px;
+  height: auto;
+  filter: drop-shadow(0 4px 6px rgba(20, 10, 4, 0.55));
+}
+
+.public-boast__score {
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--gold);
+  font-weight: 800;
+  text-shadow: 0 3px 0 var(--wood-edge);
+}
+
+.public-boast__meta {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(244, 239, 226, 0.72);
+}
+
+.public-boast__tx {
+  margin-top: 0.4rem;
+}
+
+.public-boast__hint {
+  font-size: 0.8rem;
+  color: rgba(244, 239, 226, 0.65);
+}
+
+.public-boast__foot {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
