@@ -79,6 +79,53 @@
   cursor: not-allowed;
 }
 
+/* Copy-link — plain wood button, always enabled */
+.boast__copy {
+  width: 100%;
+  letter-spacing: 0.04em;
+  color: rgba(244, 239, 226, 0.85);
+}
+
+/* Validation bands */
+.boast__validate {
+  margin-top: 0.9rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.boast__validate-title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+}
+
+.boast__validate-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: rgba(244, 239, 226, 0.68);
+  text-align: center;
+}
+
+.boast__retry {
+  align-self: center;
+  min-width: 9rem;
+}
+
+/* Keep the EmailAuthForm input readable on the wood panel */
+.boast__validate .email-auth__input {
+  color: #2b1a0c;
+}
+
+.boast__validate .email-auth__continue {
+  width: 100%;
+}
+
 /* ============================================================
    Public boast share page (/boast/:id)
    ============================================================ */

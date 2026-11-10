@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { audio } from './audio'
 import { PhoneStage } from './components/PhoneStage'
 import { WalletMenu } from './components/WalletMenu'
+import { EmailAuthForm } from './components/EmailAuthForm'
 import { Settings } from './components/icons'
 import type { GameEndPayload } from './game/types'
 import { LoadingScreen } from './screens/LoadingScreen'
@@ -176,6 +177,17 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen)
   const [deepLink] = useState(pendingDeepLink)
 
+  /**
+   * Session-validation UI state: whether the boasts screen shows the email
+   * sign-in band (run finished without a Magic token) or the "Checking your
+   * run…" retry band (validate has not answered for 10s).
+   */
+  const [validateUi, setValidateUi] = useState<'none' | 'email-prompt' | 'timed-out'>('none')
+  /** Unvalidated run payload kept alive for sign-in-triggered / retried validation. */
+  const pendingValidateRef = useRef<GameEndPayload | null>(null)
+  /** 10s watchdog for the in-flight validate request. */
+  const validateTimerRef = useRef<number | null>(null)
+
   /** `/boast/<id>` on a shared link — public record for that boast. */
   const publicBoastId = useMemo(
     () => parsePublicBoastId(window.location.pathname),
@@ -202,6 +214,142 @@ export default function App() {
       cancelled = true
     }
   }, [screen])
+
+  /** `/boast/<id>` public link base, e.g. https://fruit-rush.xyz */
+  const shareSite = useMemo(
+    () => (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined ?? '').replace(/\/$/, ''),
+    [],
+  )
+
+  /**
+   * Build the text/URL pair the Share + Copy-link actions use:
+   * before a mint it advertises the score with the site link, after a mint
+   * it points at the public /boast/<id> record.
+   */
+  const buildShareContent = useCallback((score: number, mintedId: number | null | undefined) => {
+    if (mintedId != null) {
+      return {
+        text: `I scored ${score.toLocaleString()} in Fruit Rush`,
+        url: `${shareSite}/boast/${mintedId}`,
+      }
+    }
+    return {
+      text: `I scored ${score.toLocaleString()} in Fruit Rush: ${shareSite}`,
+      url: shareSite,
+    }
+  }, [shareSite])
+
+  /**
+   * Fire the /session/validate request for a finished run.
+   * A 10s watchdog flips the boast screen to "Checking your run… / Retry";
+   * wallet-only players without a Magic token get the email sign-in band
+   * instead, and the run waits in pendingValidateRef for a later attempt.
+   */
+  const validateRun = useCallback((payload: GameEndPayload) => {
+    if (!payload.inputEventLog?.length) return
+    const playerId = wallet.address
+    if (!playerId || !/^0x[0-9a-fA-F]{40}$/.test(playerId)) {
+      // No wallet address available right now — the email sign-in prompt can
+      // provide one (its effect re-runs validation once the address lands).
+      console.log('[validate] skipped: no Magic token')
+      setValidateUi('email-prompt')
+      return
+    }
+    void getMagicIdToken().then((token) => {
+      if (!token) {
+        console.log('[validate] skipped: no Magic token')
+        setValidateUi('email-prompt')
+        return
+      }
+      if (validateTimerRef.current != null) window.clearTimeout(validateTimerRef.current)
+      // 10s watchdog: don't leave the player spinning silently.
+      validateTimerRef.current = window.setTimeout(() => setValidateUi('timed-out'), 10_000)
+      void validateGameSession(token, {
+        playerId,
+        score: payload.score,
+        mode: payload.mode,
+        comboHighwater: payload.comboHighwater,
+        durationSeconds: payload.durationSeconds,
+        timestamp: Date.now(),
+        isPersonalBest: payload.score > personalBest && payload.score > 0,
+        fruitsSliced: payload.fruitsSliced,
+        fruitsMissed: payload.fruitsMissed,
+        bombsHit: payload.bombsHit,
+        criticalSlices: payload.criticalSlices,
+        accuracy: payload.accuracy,
+        inputEventLog: payload.inputEventLog,
+      }).then((validation) => {
+        // Validation visibility: log every call with its status and payload —
+        // the session/validate request is the anti-cheat contract with the
+        // backend, and silent failures made boast/leaderboard bugs opaque.
+        if (validateTimerRef.current != null) {
+          window.clearTimeout(validateTimerRef.current)
+          validateTimerRef.current = null
+        }
+        setValidateUi('none')
+        console.log(
+          `[validate] isValid=${validation.valid}${validation.rejectionReason ? ` reason=${validation.rejectionReason}` : ''}`,
+          validation,
+        )
+        setLastResult((current) => current ? {
+          ...current,
+          backendSessionId: validation.sessionId,
+          backendValidation: validation.valid ? 'valid' : 'invalid',
+        } : current)
+        if (!validation.valid) showToast(validation.rejectionReason || 'Score could not be validated')
+      }).catch((error: unknown) => {
+        if (validateTimerRef.current != null) {
+          window.clearTimeout(validateTimerRef.current)
+          validateTimerRef.current = null
+        }
+        setValidateUi('none')
+        setLastResult((current) => current ? { ...current, backendValidation: 'unavailable' } : current)
+        const message = error instanceof Error ? error.message : 'Backend unavailable'
+        console.log('[validate] request failed:', message)
+        showToast(message)
+      })
+    })
+  }, [wallet.address, personalBest, showToast])
+
+  /**
+   * When the player finishes email sign-in on the boast screen (or a Magic
+   * address arrives for a wallet-only player), automatically validate the
+   * run that was left pending.
+   */
+  useEffect(() => {
+    if (validateUi !== 'email-prompt') return
+    const run = pendingValidateRef.current
+    if (!run) return
+    // The email sign-in flow provisions a Magic address underneath; validation
+    // needs both the token and an address, so wait for both to be present.
+    if (!/^0x[0-9a-fA-F]{40}$/.test(wallet.address ?? '')) return
+    let cancelled = false
+    void (async () => {
+      const token = await getMagicIdToken()
+      if (cancelled) return
+      if (!token) {
+        console.log('[validate] skipped: no Magic token')
+        return
+      }
+      pendingValidateRef.current = null
+      setValidateUi('none')
+      validateRun(run)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [validateUi, wallet.email, wallet.address, validateRun])
+
+  /** Manual Retry from the "Checking your run…" band. */
+  const retryValidation = useCallback(() => {
+    const run = pendingValidateRef.current
+    setValidateUi('none')
+    if (!run) {
+      showToast('Nothing to verify — finish a run first')
+      return
+    }
+    validateRun(run)
+  }, [showToast, validateRun])
 
   /** Resolve an EIP-1193 provider + sender account for on-chain writes. */
   const resolveWriteProvider = useCallback(async (): Promise<{
@@ -407,49 +555,22 @@ export default function App() {
       setMintedId(null)
       setMintStep('idle')
       setMintTxHash(null)
+      setValidateUi('none')
+      pendingValidateRef.current = null
+      if (validateTimerRef.current != null) {
+        window.clearTimeout(validateTimerRef.current)
+        validateTimerRef.current = null
+      }
 
-      void getMagicIdToken().then((token) => {
-        if (!token || (!wallet.address && wallet.status !== 'connected')) return
-        if (!payload.inputEventLog?.length) return
-        void validateGameSession(token, {
-          playerId: wallet.address!,
-          score: payload.score,
-          mode: payload.mode,
-          comboHighwater: payload.comboHighwater,
-          durationSeconds: payload.durationSeconds,
-          timestamp: Date.now(),
-          isPersonalBest,
-          fruitsSliced: payload.fruitsSliced,
-          fruitsMissed: payload.fruitsMissed,
-          bombsHit: payload.bombsHit,
-          criticalSlices: payload.criticalSlices,
-          accuracy: payload.accuracy,
-          inputEventLog: payload.inputEventLog,
-        }).then((validation) => {
-          // Validation visibility: log every call with its status and payload —
-          // the session/validate request is the anti-cheat contract with the
-          // backend, and silent failures made boast/leaderboard bugs opaque.
-          console.log(
-            `[validate] isValid=${validation.valid}${validation.rejectionReason ? ` reason=${validation.rejectionReason}` : ''}`,
-            validation,
-          )
-          setLastResult((current) => current ? {
-            ...current,
-            backendSessionId: validation.sessionId,
-            backendValidation: validation.valid ? 'valid' : 'invalid',
-          } : current)
-          if (!validation.valid) showToast(validation.rejectionReason || 'Score could not be validated')
-        }).catch((error: unknown) => {
-          setLastResult((current) => current ? { ...current, backendValidation: 'unavailable' } : current)
-          const message = error instanceof Error ? error.message : 'Backend unavailable'
-          console.log('[validate] request failed:', message)
-          showToast(message)
-        })
-      })
+      // Keeps the run available for a later sign-in-triggered or retried
+      // validation — wallet-only users can authenticate with email after
+      // the run ended and still get their score validated.
+      pendingValidateRef.current = payload
+      validateRun(payload)
       // Replace /play in history so Back from results returns to modes, not a new game.
       navigate('results', { replace: true })
     },
-    [navigate, personalBest, wallet.address, wallet.status, showToast],
+    [navigate, personalBest, wallet.address, wallet.status, showToast, validateRun],
   )
 
   const showWallet =
@@ -615,13 +736,22 @@ export default function App() {
             mintStep={mintStep}
             feeCusd={boastFeeCusd}
             txUrl={mintTxHash ? celoscanTxUrl(mintTxHash) : null}
+            validationState={validateUi}
+            onRetryValidation={retryValidation}
+            emailAuthSlot={
+              <EmailAuthForm wallet={wallet} compact />
+            }
             onMint={async () => {
               if (!wallet.requireConnect()) {
                 showToast(saveProgressToast(wallet.inMiniPay))
                 return
               }
               if (!lastResult.backendSessionId) {
-                showToast('Score is still being validated')
+                if (validateUi === 'email-prompt') {
+                  showToast('Sign in with email to validate this run')
+                } else {
+                  showToast('Score is still being validated')
+                }
                 return
               }
               const token = await getMagicIdToken()
@@ -651,25 +781,40 @@ export default function App() {
               }
             }}
             onShare={async () => {
-              // Only a minted boast has a public page /boast/<id>.
-              if (mintedId == null) {
-                showToast('Mint the boast to share it')
-                return
-              }
-              const url = `${import.meta.env.VITE_PUBLIC_APP_URL}/boast/${mintedId}`
+              // A minted boast shares its public /boast/<id> page; before the
+              // mint, share the score text with the site link.
+              const content = buildShareContent(lastResult.score, mintedId)
               try {
                 if (navigator.share) {
                   await navigator.share({
                     title: 'Fruit Rush Boast',
-                    text: `I scored ${lastResult.score.toLocaleString()} in Fruit Rush`,
-                    url,
+                    text: content.text,
+                    url: content.url,
                   })
                 } else {
-                  await navigator.clipboard.writeText(url)
+                  await navigator.clipboard.writeText(mintedId != null ? content.url : content.text)
                   showToast('Boast link copied')
                 }
+              } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : String(error)
+                if (/cancel|abort|dismissed/i.test(message)) {
+                  showToast('Share cancelled')
+                } else {
+                  await navigator.clipboard.writeText(mintedId != null ? content.url : content.text).catch(() => {})
+                  showToast('Boast link copied')
+                }
+              }
+            }}
+            onCopyLink={async () => {
+              // Copy link is always available: before the mint it copies the
+              // score brag with the public site URL, after the mint the
+              // per-boast page.
+              const content = buildShareContent(lastResult.score, mintedId)
+              try {
+                await navigator.clipboard.writeText(mintedId != null ? content.url : content.text)
+                showToast(mintedId != null ? 'Boast link copied' : 'Link copied')
               } catch {
-                showToast('Share cancelled')
+                showToast('Copy failed — long-press to copy manually')
               }
             }}
             onDismiss={() => go('home')}

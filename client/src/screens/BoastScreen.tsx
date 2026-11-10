@@ -1,13 +1,18 @@
 import { uiArt } from '../assets/designs'
 import { Close } from '../components/icons'
-import type { CSSProperties } from 'react'
+import type { ReactNode, CSSProperties } from 'react'
 import '../styles/boast.css'
 
 export type MintStep = 'idle' | 'signing' | 'approving' | 'minting'
 
+/** Validation status surfaced by App: nothing pending, email sign-in band, or watchdog retry band. */
+export type ValidateUiState = 'none' | 'email-prompt' | 'timed-out'
+
 interface BoastScreenProps {
   onMint: () => void
   onShare: () => void
+  /** Always-enabled copy action — works before and after the mint. */
+  onCopyLink: () => void
   onDismiss: () => void
   /** On-chain boast ID once minted (null until the BoastMinted receipt lands). */
   mintedId?: number | null
@@ -18,6 +23,11 @@ interface BoastScreenProps {
   feeCusd?: string | null
   /** Mint transaction Celoscan URL — "View tx" link. */
   txUrl?: string | null
+  /** Validation bands: email sign-in prompt / "Checking your run…" retry. */
+  validationState?: ValidateUiState
+  onRetryValidation?: () => void
+  /** Rendered inside the email band (App owns the Magic EmailAuthForm). */
+  emailAuthSlot?: ReactNode
 }
 
 const STEP_LABELS: Record<MintStep, string> = {
@@ -30,12 +40,16 @@ const STEP_LABELS: Record<MintStep, string> = {
 export function BoastScreen({
   onMint,
   onShare,
+  onCopyLink,
   onDismiss,
   mintedId = null,
   score = null,
   mintStep = 'idle',
   feeCusd = null,
   txUrl = null,
+  validationState = 'none',
+  onRetryValidation,
+  emailAuthSlot,
 }: BoastScreenProps) {
   const minting = mintStep !== 'idle'
   const hasMinted = mintedId != null
@@ -73,6 +87,28 @@ export function BoastScreen({
         )}
       </section>
 
+      {validationState === 'email-prompt' && (
+        <section className="wood-panel boast__validate" aria-live="polite">
+          <p className="boast__validate-title">Sign in with email to validate this run</p>
+          <p className="boast__validate-hint">
+            Your score can be verified on-chain once it passes validation — email sign-in enables
+            boast minting.
+          </p>
+          {emailAuthSlot}
+        </section>
+      )}
+
+      {validationState === 'timed-out' && (
+        <section className="wood-panel boast__validate" role="status">
+          <p className="boast__validate-title">Checking your run…</p>
+          {onRetryValidation && (
+            <button type="button" className="btn boast__retry" onClick={onRetryValidation}>
+              Retry
+            </button>
+          )}
+        </section>
+      )}
+
       <section className="boast__actions">
         {!hasMinted && (
           <button type="button" className="btn btn--orange" disabled={minting} onClick={onMint}>
@@ -88,9 +124,12 @@ export function BoastScreen({
           </button>
         ) : (
           <button type="button" className="btn boast__share--locked" disabled>
-            Mint to share
+            Mint to unlock share
           </button>
         )}
+        <button type="button" className="btn boast__copy" onClick={onCopyLink}>
+          Copy link
+        </button>
       </section>
     </main>
   )
