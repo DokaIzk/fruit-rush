@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockLoginWithEmailOTP,
@@ -7,6 +7,7 @@ const {
   mockIsLoggedIn,
   mockLogout,
   mockGetIdToken,
+  mockGenerateIdToken,
   mockWriteContract,
   mockWaitForReceipt,
   mockSignMessage,
@@ -17,6 +18,7 @@ const {
   mockIsLoggedIn: vi.fn(),
   mockLogout: vi.fn(),
   mockGetIdToken: vi.fn(),
+  mockGenerateIdToken: vi.fn(),
   mockWriteContract: vi.fn(),
   mockWaitForReceipt: vi.fn(),
   mockSignMessage: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock('magic-sdk', () => {
       isLoggedIn: mockIsLoggedIn,
       logout: mockLogout,
       getIdToken: mockGetIdToken,
+      generateIdToken: mockGenerateIdToken,
     }
     rpcProvider = { request: vi.fn() }
     constructor(_key: string, _opts?: unknown) {}
@@ -58,6 +61,8 @@ vi.mock('viem', async () => {
 
 import {
   __resetMagicForTests,
+  didTokenExpiryMs,
+  getMagicIdToken,
   getWalletAddress,
   isMagicConfigured,
   loginWithEmail,
@@ -67,6 +72,78 @@ import {
   sendCUSD,
   signMessage,
 } from '../magicAuth'
+
+/** Builds a Magic DID-shaped token whose ext claim is `epochSeconds`. */
+function didTokenWithExpiry(epochSeconds: number): string {
+  const seg = (bytes: Uint8Array) =>
+    btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const claim = JSON.stringify({ iss: 'did:ethr:0xabc', aud: 'pk', sub: '0xabc', iat: 1, ext: epochSeconds })
+  return `${seg(new TextEncoder().encode('proof'))}.${seg(new TextEncoder().encode(claim))}.${seg(new TextEncoder().encode('sig'))}`
+}
+
+describe('magicAuth token refresh hang', () => {
+  beforeEach(() => {
+    __resetMagicForTests()
+    vi.clearAllMocks()
+    vi.stubEnv('VITE_MAGIC_PUBLISHABLE_KEY', 'pk_test_fruit_rush')
+    vi.stubEnv('PROD', false)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('didTokenExpiryMs reads the ext claim', () => {
+    const token = didTokenWithExpiry(1_700_000_000)
+    expect(didTokenExpiryMs(token)).toBe(1_700_000_000_000)
+    expect(didTokenExpiryMs('garbage')).toBeNull()
+  })
+
+  it('returns null within ~4s when generateIdToken hangs forever on an expired token', async () => {
+    vi.useFakeTimers()
+    const expired = didTokenWithExpiry(Math.floor(Date.now() / 1000) - 60)
+    mockIsLoggedIn.mockResolvedValue(true)
+    mockGetIdToken.mockResolvedValue(expired)
+    // Never resolves — the hang scenario.
+    mockGenerateIdToken.mockReturnValue(new Promise(() => {}))
+
+    const started = Date.now()
+    const pending = getMagicIdToken()
+
+    // Advance past the 4s refresh timeout; the watchdog-busting hang must not
+    // keep the promise pending past this point.
+    await vi.advanceTimersByTimeAsync(4_100)
+    const result = await pending
+
+    expect(result).toBeNull()
+    expect(Date.now() - started).toBeLessThan(5_000)
+    expect(mockGenerateIdToken).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the refreshed token when generateIdToken resolves quickly', async () => {
+    vi.useFakeTimers()
+    const expired = didTokenWithExpiry(Math.floor(Date.now() / 1000) - 60)
+    mockIsLoggedIn.mockResolvedValue(true)
+    mockGetIdToken.mockResolvedValue(expired)
+    mockGenerateIdToken.mockResolvedValue('did:fresh')
+
+    const pending = getMagicIdToken()
+    await vi.advanceTimersByTimeAsync(100)
+    await expect(pending).resolves.toBe('did:fresh')
+  })
+
+  it('passes an unexpired cached token through without refreshing', async () => {
+    vi.useFakeTimers()
+    const valid = didTokenWithExpiry(Math.floor(Date.now() / 1000) + 3_600)
+    mockIsLoggedIn.mockResolvedValue(true)
+    mockGetIdToken.mockResolvedValue(valid)
+
+    const pending = getMagicIdToken()
+    await vi.advanceTimersByTimeAsync(100)
+    await expect(pending).resolves.toBe(valid)
+    expect(mockGenerateIdToken).not.toHaveBeenCalled()
+  })
+})
 
 describe('magicAuth', () => {
   beforeEach(() => {

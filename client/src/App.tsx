@@ -250,25 +250,29 @@ export default function App() {
    */
   const validateRun = useCallback((payload: GameEndPayload) => {
     if (!payload.inputEventLog?.length) return
+    console.log(`[validate] start score=${payload.score} mode=${payload.mode} events=${payload.inputEventLog.length}`)
     const playerId = wallet.address
     if (!playerId || !/^0x[0-9a-fA-F]{40}$/.test(playerId)) {
       // No wallet address available right now — the email sign-in prompt can
       // provide one (its effect re-runs validation once the address lands).
-      console.log('[validate] skipped: no Magic token')
+      console.log('[validate] skipped: no Magic address')
       flushValidateWaiters({ sessionId: null, valid: null })
       setValidateUi('email-prompt')
       return
     }
+    console.log('[validate] acquiring Magic token…')
     void getMagicIdToken().then((token) => {
       if (!token) {
-        console.log('[validate] skipped: no Magic token')
+        console.log('[validate] skipped: no Magic token (null/timeout/expired)')
         flushValidateWaiters({ sessionId: null, valid: null })
         setValidateUi('email-prompt')
         return
       }
+      console.log(`[validate] Magic token acquired (len=${token.length})`)
       if (validateTimerRef.current != null) window.clearTimeout(validateTimerRef.current)
       // 10s watchdog: don't leave the player spinning silently.
       validateTimerRef.current = window.setTimeout(() => setValidateUi('timed-out'), 10_000)
+      console.log('[validate] POST /session/validate …')
       void validateGameSession(token, {
         playerId,
         score: payload.score,

@@ -1,5 +1,6 @@
 import { uiArt } from '../assets/designs'
 import { Flame } from '../components/icons'
+import { currentWinStreak } from '../components/results/resultsRewards'
 import { useWallet } from '../state/useWallet'
 import { formatCusd } from '../onchain/boast'
 import { useCusdBalance } from '../onchain/useCusdBalance'
@@ -15,13 +16,16 @@ interface HomeScreenProps {
 export function HomeScreen({ onPlay, onShop, onCompete }: HomeScreenProps) {
   const wallet = useWallet()
   const { cusdWei } = useCusdBalance(wallet.address)
+  const streak = currentWinStreak()
 
   return (
     <main className="home-screen" style={{ backgroundImage: `url(${uiArt.woodBg})` }}>
       <header className="home-screen__top">
-        <div className="app-screen__chip" aria-label="Current streak: 3 days">
-          <Flame size={14} /> 3 day streak
-        </div>
+        {streak > 0 && (
+          <div className="app-screen__chip" aria-label={`Win streak: ${streak} ${streak === 1 ? 'run' : 'runs'}`}>
+            <Flame size={14} /> {streak} win streak
+          </div>
+        )}
         {/* Real cUSD balance — the fake 2322 is gone. Hidden until a wallet answers. */}
         {cusdWei != null && (
           <div className="app-screen__chip app-screen__chip--gold">{formatCusd(cusdWei)}</div>

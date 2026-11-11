@@ -185,28 +185,39 @@ export async function getMagicIdToken(): Promise<string | null> {
   const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
     Promise.race([
       promise,
-      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), ms)),
+      new Promise<null>((resolve) => globalThis.setTimeout(() => resolve(null), ms)),
     ])
   try {
     const magic = getMagic()
     const loggedIn = await withTimeout(magic.user.isLoggedIn(), 5_000)
     if (!loggedIn) return null
     const token = await withTimeout(magic.user.getIdToken(), 10_000)
-    if (!token) return null
-    // A cached token past its `ext` claim gets a 401 from the backend. Try a
-    // silent relogin (no OTP UI) for a fresh token; if that fails, treat the
-    // player as signed out so the email sign-in prompt shows instead.
+    if (!token) {
+      console.log('[auth] getIdToken returned nothing — treating player as signed out')
+      return null
+    }
+    // A cached token past its `ext` claim gets a 401 from the backend. Refresh
+    // with a short hard timeout (4s) so a hung refresh call can never stall a
+    // downstream fetch (e.g. /session/validate) past its watchdog. On timeout
+    // or failure, fall back to the cached token if still unexpired — otherwise
+    // treat the player as signed out so the email sign-in prompt shows.
     const expiry = didTokenExpiryMs(token)
     if (expiry != null && expiry <= Date.now()) {
       console.log(`[auth] Magic DID token expired at ${new Date(expiry).toISOString()} — refreshing silently`)
+      let fresh: string | null = null
       try {
         // Regenerates a fresh DID token from the persisted session (no OTP UI).
-        const fresh = await withTimeout(magic.user.generateIdToken({ lifespan: 1_800 }), 10_000)
-        if (fresh) return fresh
+        fresh = await withTimeout(magic.user.generateIdToken({ lifespan: 1_800 }), 4_000)
       } catch {
-        /* fall through to signed-out */
+        fresh = null
       }
-      console.log('[auth] silent token refresh failed — treating player as signed out')
+      if (fresh) {
+        console.log('[auth] silent token refresh succeeded')
+        return fresh
+      }
+      // The cached token is expired by definition on this branch — no safe
+      // fallback. Treat as signed out.
+      console.log('[auth] silent token refresh timed out or failed — treating player as signed out')
       return null
     }
     return token

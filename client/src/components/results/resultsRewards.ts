@@ -77,6 +77,11 @@ export function xpForLevel(level: number): number {
   return Math.max(100, level * 180)
 }
 
+/** Consecutive scored runs (persisted). Zero when no wins on record. */
+export function currentWinStreak(): number {
+  return Math.max(0, readInt(STREAK_KEY, 0))
+}
+
 export function headlineFor(result: GameSessionResult): string {
   if (result.score <= 0) return 'SO CLOSE'
   if (result.isPersonalBest && result.score >= 500) return 'AMAZING!'
