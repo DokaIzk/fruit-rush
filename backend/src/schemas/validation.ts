@@ -23,6 +23,7 @@ export const GameSessionResultSchema = z.object({
   score: z.number().int().nonnegative().max(10_000_000), // Max 10M score
   gameMode: GameModeSchema,
   comboHighwater: z.number().int().nonnegative().max(1000), // Max 1000 combo
+  fruitsSliced: z.number().int().nonnegative().max(100_000).optional(), // Cross-check consistency
   durationSeconds: z.number().positive().max(600), // Max 10 minutes
   clientTimestamp: z.number().int().positive(),
   inputEventLog: z.array(InputEventSchema).min(1).max(10_000), // Max 10K events

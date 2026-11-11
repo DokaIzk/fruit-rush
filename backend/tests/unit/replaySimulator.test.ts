@@ -7,7 +7,7 @@
 import { replaySimulation, _testing } from '../../src/validator/replaySimulator';
 import { InputEvent } from '../../src/types/session';
 
-const { validateInputLog, SIMULATION_TIMESTEP_MS, COLLISION_THRESHOLD } = _testing;
+const { validateInputLog } = _testing;
 
 describe('Replay Simulator', () => {
   describe('validateInputLog', () => {
@@ -61,9 +61,10 @@ describe('Replay Simulator', () => {
     });
 
     it('should detect superhuman input rate', () => {
-      // Generate 101 events in <1 second
+      // Generate 101 events in <500ms — 200+ inputs/sec, synthetic rate
+      // (legit trail sampling is ~60Hz per touch).
       const events: InputEvent[] = Array.from({ length: 101 }, (_, i) => ({
-        t: i * 9, // 9ms apart = 111 inputs/sec
+        t: i * 4, // 4ms apart = 250 inputs/sec
         x: 0.5,
         y: 0.5,
         velocity: 0.8,
@@ -85,45 +86,75 @@ describe('Replay Simulator', () => {
 
       expect(result.valid).toBe(true);
       expect(result.serverScore).toBe(0); // No fruits sliced
-      expect(result.divergence).toBe(0);
+      expect(result.divergence).toBeLessThanOrEqual(100);
       expect(result.rejectionReason).toBeNull();
     });
 
-    it('should accept score within 2% tolerance', () => {
-      const events: InputEvent[] = [
-        { t: 850, x: 0.5, y: 0.5, velocity: 1.0 },
-        { t: 1700, x: 0.5, y: 0.5, velocity: 1.0 },
-        { t: 2550, x: 0.5, y: 0.5, velocity: 1.0 },
-      ];
-
-      const clientScore = 35; // Assume client reported this
-      const result = replaySimulation(events, clientScore, 'Classic', 3);
-
-      // Should accept if divergence < 2%
-      if (result.serverScore > 0) {
-        const expectedDivergence = Math.abs(result.serverScore - clientScore) / clientScore * 100;
-        expect(result.divergence).toBeCloseTo(expectedDivergence, 1);
-        
-        if (result.divergence <= 2.0) {
-          expect(result.valid).toBe(true);
-        } else {
-          expect(result.valid).toBe(false);
+    it('should accept an honest score within the plausibility bound', () => {
+      // A dense trail like the client records (multi-point strokes).
+      const events: InputEvent[] = [];
+      for (let stroke = 0; stroke < 8; stroke++) {
+        for (let i = 0; i < 10; i++) {
+          events.push({
+            t: stroke * 1200 + i * 16,
+            x: 0.2 + stroke * 0.08,
+            y: 0.2 + i * 0.06,
+            velocity: 1.0,
+          });
         }
       }
+
+      const result = replaySimulation(events, 85, 'Classic', 13, 8, 4);
+      expect(result.valid).toBe(true);
+      expect(result.rejectionReason).toBeNull();
     });
 
-    it('should reject score with >2% divergence', () => {
+    it('should reject a score above the plausibility bound', () => {
       const events: InputEvent[] = [
-        { t: 850, x: 0.5, y: 0.5, velocity: 1.0 },
+        { t: 100, x: 0.5, y: 0.5, velocity: 1.0 },
+        { t: 116, x: 0.55, y: 0.55, velocity: 1.0 },
+        { t: 132, x: 0.6, y: 0.6, velocity: 1.0 },
       ];
 
-      const clientScore = 1000; // Way higher than possible
-      const result = replaySimulation(events, clientScore, 'Classic', 1);
+      // 1s run: max 3 fruits × 50 pts = 150
+      const result = replaySimulation(events, 10_000, 'Classic', 1);
 
       expect(result.valid).toBe(false);
-      expect(result.divergence).toBeGreaterThan(2.0);
-      expect(result.rejectionReason).toContain('divergence');
-      expect(result.rejectionReason).toContain('exceeds');
+      expect(result.rejectionReason).toContain('plausibility bound');
+    });
+
+    it('should reject a score inconsistent with the reported slice count', () => {
+      const events: InputEvent[] = [];
+      for (let stroke = 0; stroke < 6; stroke++) {
+        for (let i = 0; i < 10; i++) {
+          events.push({
+            t: stroke * 1200 + i * 16,
+            x: 0.2 + stroke * 0.08,
+            y: 0.2 + i * 0.06,
+            velocity: 1.0,
+          });
+        }
+      }
+
+      // 5 slices × 50 max pts = 250 ceiling — 900 is impossible
+      const result = replaySimulation(events, 900, 'Classic', 10, 5, 2);
+      expect(result.valid).toBe(false);
+      expect(result.rejectionReason).toContain('slices');
+
+      // Combo higher than the slice count is impossible too
+      const result2 = replaySimulation(events, 50, 'Classic', 10, 3, 9);
+      expect(result2.valid).toBe(false);
+      expect(result2.rejectionReason).toContain('Combo');
+    });
+
+    it('should reject a nonzero score with an empty trail', () => {
+      const events: InputEvent[] = [
+        { t: 100, x: 0.5, y: 0.5, velocity: 1.0 },
+      ];
+
+      const result = replaySimulation(events, 300, 'Classic', 1);
+      expect(result.valid).toBe(false);
+      expect(result.rejectionReason).toContain('input events');
     });
 
     it('should handle empty score correctly', () => {
@@ -150,24 +181,33 @@ describe('Replay Simulator', () => {
 
     it('should handle tournament mode', () => {
       const events: InputEvent[] = [
-        { t: 850, x: 0.5, y: 0.5, velocity: 1.0 },
+        { t: 0, x: 0.5, y: 0.5, velocity: 1.0 },
+        { t: 16, x: 0.52, y: 0.52, velocity: 1.0 },
+        { t: 32, x: 0.54, y: 0.54, velocity: 1.0 },
       ];
 
-      const result = replaySimulation(events, 15, 'Tournament', 2);
+      const result = replaySimulation(events, 25, 'Tournament', 2, 2, 1);
 
-      // Should validate same as other modes
-      expect(result.valid).toBeDefined();
+      expect(result.valid).toBe(true);
       expect(result.serverScore).toBeGreaterThanOrEqual(0);
     });
   });
 
   describe('Constants', () => {
-    it('should have reasonable simulation timestep', () => {
-      expect(SIMULATION_TIMESTEP_MS).toBe(10);
+    it('should have a reasonable simulation timestep', () => {
+      expect(_testing.SIMULATION_TIMESTEP_S).toBeCloseTo(0.01);
     });
 
-    it('should have reasonable collision threshold', () => {
-      expect(COLLISION_THRESHOLD).toBe(90); // 50px swipe + 40px fruit
+    it('should use an aspect-free fruit radius close to the client hitbox', () => {
+      // Client radii are 26–32 px on a ~900px viewport → ~0.03–0.065.
+      expect(_testing.FRUIT_RADIUS).toBeGreaterThan(0.02);
+      expect(_testing.FRUIT_RADIUS).toBeLessThan(0.08);
+    });
+
+    it('should use the client spawn cadence per mode', () => {
+      expect(_testing.SPAWN_GAP_MS.Classic).toBe(520);
+      expect(_testing.SPAWN_GAP_MS.Zen).toBe(700);
+      expect(_testing.SPAWN_GAP_MS.Arcade).toBe(400);
     });
   });
 });

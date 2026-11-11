@@ -143,6 +143,7 @@ export function validateGameSession(
       durationSeconds: result.durationSeconds,
       clientTimestamp: result.timestamp,
       inputEventLog: result.inputEventLog,
+      fruitsSliced: result.fruitsSliced,
     }),
   })
 }

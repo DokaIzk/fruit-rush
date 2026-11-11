@@ -54,12 +54,14 @@ router.post(
 
     const session = validationResult.data;
 
-    // Run replay simulation
+    // Run replay simulation + plausibility checks
     const { serverScore, valid, divergence, rejectionReason } = replaySimulation(
       session.inputEventLog,
       session.score,
       session.gameMode,
-      session.durationSeconds
+      session.durationSeconds,
+      session.fruitsSliced,
+      session.comboHighwater
     );
 
     // Store session in Supabase

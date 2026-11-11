@@ -1,160 +1,100 @@
 /**
- * Replay Score Simulator
+ * Replay Sanity Validator
  * =======================
- * Server-authoritative score validation via input event replay simulation.
- * 
- * ## Simulation Approach
- * 
- * This validator re-simulates the player's game session by replaying their
- * input events (swipe coordinates and velocities) through a simplified physics
- * model. The goal is to verify that the client-reported score matches the
- * server-computed score within an acceptable tolerance.
- * 
- * ## Why Not Exact Parity?
- * 
- * Achieving **exact** parity between client (browser) and server (Node.js)
- * physics is impractical because:
- * 
- * 1. **Floating-point differences**: Different CPU architectures, compilers,
- *    and runtimes (V8 browser vs. Node.js) produce slightly different results
- *    for floating-point math operations.
- * 
- * 2. **Frame timing**: The client runs at variable frame rates (16.67ms for
- *    60 FPS, but can fluctuate). The server simulates at a fixed timestep
- *    (10ms by default), leading to minor divergence in cumulative physics.
- * 
- * 3. **Library differences**: Client uses PixiJS for rendering and collision
- *    detection; server uses a lightweight custom simulation without GPU deps.
- * 
- * 4. **Determinism tradeoffs**: Full determinism requires fixed-point math
- *    and lockstep simulation, which would severely impact client performance.
- * 
- * ## Accepted Divergence Tolerance
- * 
- * We allow a **2% divergence** between client and server scores:
- * 
- * ```
- * divergence = abs(clientScore - serverScore) / clientScore * 100
- * if divergence <= 2.0% → VALID
- * if divergence > 2.0%  → REJECTED (likely cheating or bug)
- * ```
- * 
- * **Rationale:**
- * - 2% tolerance covers legitimate floating-point drift (tested empirically)
- * - Tight enough to catch score manipulation (e.g., memory editors, packet replay)
- * - Loose enough to avoid false positives from frame-rate variations
- * 
- * ## Simulation Assumptions
- * 
- * ### 1. Fruit Spawn Model
- * - Fruits spawn every 800ms ± 200ms (random jitter)
- * - Spawn positions: random X ∈ [0, 1], Y = 0 (bottom of screen)
- * - Initial velocity: random upward arc (vx ∈ [-0.3, 0.3], vy ∈ [0.8, 1.2])
- * - Gravity: -0.002 units/ms² (downward acceleration)
- * 
- * ### 2. Collision Detection
- * - Swipe hitbox: 50px radius around input (x, y) coordinates
- * - Fruit hitbox: 40px radius
- * - Collision if distance < (50 + 40) = 90px
- * - Velocity bonus: swipes with velocity > 0.5 px/ms add 10% score multiplier
- * 
- * ### 3. Scoring Rules
- * - Base fruit value: 10 points
- * - Combo multiplier: (1 + comboCount * 0.1), capped at 3x
- * - Velocity bonus: +10% if swipe velocity > 0.5 px/ms
- * - Combo breaks if no slice within 1 second
- * 
- * ### 4. Timestep
- * - Fixed 10ms simulation step (100 FPS equivalent)
- * - Input events are interpolated to nearest 10ms boundary
- * 
- * ## Known Limitations
- * 
- * - **No bomb detection**: Server does not simulate bombs (client-side only).
- *   This is acceptable because hitting a bomb ends the session early, which
- *   is detectable via session duration < expected duration.
- * 
- * - **No power-up simulation**: Power-ups (frenzy, slow-mo) are not replayed.
- *   These are Tournament-mode exclusions enforced separately.
- * 
- * - **Simplified physics**: Linear interpolation vs. client's Runge-Kutta
- *   integration can cause minor fruit trajectory differences (~1% score impact).
- * 
- * ## Security Properties
- * 
- * ✅ Prevents score inflation (client can't claim higher score than possible)
- * ✅ Detects replay attacks (nonce checked separately)
- * ✅ Catches speed hacks (impossible input timing detected)
- * ✅ Detects teleportation (impossible coordinate jumps flagged)
- * 
- * ⚠️ Does NOT prevent:
- * - Aim bots (perfectly accurate slices) — acceptable, skill-based
- * - Input recording/playback — mitigated by time-based tournament windows
- * 
- * ## Future Improvements
- * 
- * - Add WebAssembly-based deterministic physics (shared client/server)
- * - Tighten tolerance to 1% after WASM deployment
- * - Add heuristic checks (e.g., superhuman accuracy triggers manual review)
+ * Server-side sanity check for a claimed game session.
+ *
+ * ## Why not score parity?
+ *
+ * The server does not know which fruits the client spawned (spawns are
+ * randomized client-side and never transmitted), so re-simulating "the run"
+ * can only ever produce a *statistically similar* score, not the actual one.
+ * Exact parity within a few percent is therefore impossible by design, and
+ * the original parity gate rejected every honest run (divergence 100%).
+ *
+ * Instead this module:
+ *
+ * 1. Hard-gates the input log on impossibility (bounds, teleportation,
+ *    superhuman input rate) — a forged packet still fails here.
+ * 2. Gates the claimed score against a plausibility bound derived from the
+ *    fastest possible spawn cadence for the mode and the maximum points a
+ *    single fruit can ever award (base 15 × combo cap 3 × velocity bonus
+ *    1.1 ≈ 50). Falling below the floor implied by the reported
+ *    `fruitsSliced` count is equally impossible.
+ * 3. Runs a corrected physics replay as a *diagnostic* score (logged and
+ *    stored, not gating): fruits now launch in arcs configured per game
+ *    mode and slicing uses the same segment/radius geometry as the client.
+ *
+ * Security properties preserved:
+ * ✅ Prevents gross score inflation (10M-in-10s packets fail the bound)
+ * ✅ Detects replay/teleport/superhuman-rate forgeries
+ * ✅ Consistency between score, fruitsSliced and comboHighwater
+ * ⚠️ Does NOT prevent aim bots or fine-grained score inflation within the
+ *    plausibility bound — acceptable; session authenticity is ultimately
+ *    carried by the Magic-authenticated session and boast signing.
  */
 
 import { InputEvent, GameMode } from '../types/session';
 
-// Simulation constants (tuned to match client physics)
-const SIMULATION_TIMESTEP_MS = 10; // Fixed 10ms timestep
-const FRUIT_SPAWN_INTERVAL_MS = 800; // Base spawn rate
-const FRUIT_SPAWN_JITTER_MS = 200; // ±200ms random jitter
-const GRAVITY = -0.002; // Downward acceleration (units/ms²)
-const SWIPE_HITBOX_RADIUS = 50; // pixels
-const FRUIT_HITBOX_RADIUS = 40; // pixels
-const COLLISION_THRESHOLD = SWIPE_HITBOX_RADIUS + FRUIT_HITBOX_RADIUS; // 90px
-const BASE_FRUIT_SCORE = 10;
-const COMBO_MULTIPLIER_STEP = 0.1;
-const MAX_COMBO_MULTIPLIER = 3.0;
-const VELOCITY_BONUS_THRESHOLD = 0.5; // px/ms
-const VELOCITY_BONUS_MULTIPLIER = 1.1; // 10% bonus
-const COMBO_TIMEOUT_MS = 1000; // 1 second without slice breaks combo
+// Simulation constants — normalized screen units at *second* scale, ported
+// from the client's physics (client/src/game/FruitRushGame.ts):
+// client GRAVITY = 1150 px/s² on a ~900px-tall phone viewport ≈ 1.28 /s².
+const SIMULATION_TIMESTEP_S = 0.01;
+const GRAVITY_UNITS_PER_S2 = 1.28;
+const APEX_MIN = 0.45; // fraction of screen height (client: 0.45 + rnd*0.37)
+const APEX_RANGE = 0.37;
+const FRUIT_RADIUS = 0.055; // client radii 26–32 px ≈ 0.03–0.065 of height
+const SWIPE_GAP_MS = 150; // input gap longer than this means the stroke ended
+const SPAWN_GAP_MS: Record<GameMode, number> = {
+  Classic: 520, // client spawnMinMs
+  Zen: 700,
+  Arcade: 400,
+  Tournament: 520,
+};
+// Max points a single fruit can award: 15 (watermelon) × combo cap 3 × velocity bonus 1.1.
+const MAX_POINTS_PER_FRUIT = 50;
+// Min base points a fruit can award (orange/apple 10 × combo ≥ 1).
+const MIN_POINTS_PER_FRUIT = 10;
 
 interface Fruit {
-  id: number;
-  x: number; // Position (0-1 normalized)
-  y: number;
-  vx: number; // Velocity (units/ms)
-  vy: number;
+  x: number; // 0..1 (x normalized to screen height for aspect-free distance)
+  y: number; // 1 = bottom, 0 = top
+  vx: number; // units/s
+  vy: number; // units/s (negative = upward)
   active: boolean;
-  spawnTime: number;
 }
 
-interface SimulationState {
+interface SimState {
   fruits: Fruit[];
   score: number;
   combo: number;
-  lastSliceTime: number;
-  nextFruitId: number;
-  nextSpawnTime: number;
+  lastSliceTimeS: number;
+  nextSpawnS: number;
 }
 
 /**
- * Replay-validate a game session and compute server-authoritative score.
- * 
- * @param inputEventLog - Client-recorded input events
- * @param clientScore - Client-reported score (for comparison)
- * @param gameMode - Game mode (affects spawn rates)
+ * Replay-validate a claimed session.
+ *
+ * @param inputEventLog - Client-recorded input event trail
+ * @param clientScore - Claimed score
+ * @param gameMode - Game mode (drives spawn cadence for the bound)
  * @param durationSeconds - Session duration
- * @returns Server-computed score and validation result
+ * @param fruitsSliced - Optional client-reported slice count (tightens consistency)
+ * @param comboHighwater - Optional client-reported best combo (tightens consistency)
  */
 export function replaySimulation(
   inputEventLog: InputEvent[],
   clientScore: number,
-  _gameMode: GameMode,
-  durationSeconds: number
+  gameMode: GameMode,
+  durationSeconds: number,
+  fruitsSliced?: number,
+  comboHighwater?: number
 ): {
   serverScore: number;
   valid: boolean;
   divergence: number;
   rejectionReason: string | null;
 } {
-  // Validation: check for impossible input patterns
+  // 1. Hard gates: impossible input patterns
   const inputValidation = validateInputLog(inputEventLog, durationSeconds);
   if (!inputValidation.valid) {
     return {
@@ -165,60 +105,202 @@ export function replaySimulation(
     };
   }
 
-  // Initialize simulation state
-  const state: SimulationState = {
-    fruits: [],
-    score: 0,
-    combo: 0,
-    lastSliceTime: 0,
-    nextFruitId: 0,
-    nextSpawnTime: randomSpawnTime(0),
+  // 2. Plausibility gates on the claimed score
+  const plausibility = checkScorePlausibility(
+    clientScore,
+    gameMode,
+    durationSeconds,
+    inputEventLog.length,
+    fruitsSliced,
+    comboHighwater
+  );
+  if (!plausibility.valid) {
+    return {
+      serverScore: 0,
+      valid: false,
+      divergence: 100,
+      rejectionReason: plausibility.reason!,
+    };
+  }
+
+  // 3. Diagnostic replay (non-gating): corrected physics so the simulated
+  // score is meaningful telemetry about input density.
+  const serverScore = Math.round(runDiagnosticReplay(inputEventLog, gameMode, durationSeconds));
+  const divergence = Math.abs(clientScore - serverScore) / Math.max(clientScore, 1) * 100;
+
+  return {
+    serverScore,
+    valid: true,
+    divergence,
+    rejectionReason: null,
   };
+}
 
-  // Run simulation
-  const durationMs = durationSeconds * 1000;
-  const inputEvents = [...inputEventLog].sort((a, b) => a.t - b.t);
-  let inputIndex = 0;
+/**
+ * Plausibility bound for the claimed score.
+ */
+function checkScorePlausibility(
+  clientScore: number,
+  gameMode: GameMode,
+  durationSeconds: number,
+  eventCount: number,
+  fruitsSliced?: number,
+  comboHighwater?: number
+): { valid: boolean; reason: string | null } {
+  if (clientScore <= 0) return { valid: true, reason: null };
 
-  for (let t = 0; t <= durationMs; t += SIMULATION_TIMESTEP_MS) {
-    // Spawn fruits
-    while (t >= state.nextSpawnTime && t < durationMs) {
-      spawnFruit(state, t);
-      state.nextSpawnTime = randomSpawnTime(t);
+  // A score implies some input existed.
+  if (eventCount < 3) {
+    return { valid: false, reason: `Score ${clientScore} claimed with only ${eventCount} input events` };
+  }
+
+  // Max fruits that could possibly spawn in this duration at the mode's
+  // fastest spawn cadence.
+  const maxFruits = Math.ceil((durationSeconds * 1000) / SPAWN_GAP_MS[gameMode]);
+  const maxScore = maxFruits * MAX_POINTS_PER_FRUIT;
+  if (clientScore > maxScore) {
+    return {
+      valid: false,
+      reason: `Score ${clientScore} exceeds plausibility bound ${maxScore} (${maxFruits} max fruits × ${MAX_POINTS_PER_FRUIT} pts)`,
+    };
+  }
+
+  // Cross-check the claimed slice count when present: score = Σ fruit points
+  // × combo multiplier ⇒ floor/ceiling of points per slice.
+  if (typeof fruitsSliced === 'number') {
+    if (clientScore > 0 && fruitsSliced <= 0) {
+      return { valid: false, reason: `Score ${clientScore} claimed with ${fruitsSliced} slices` };
     }
-
-    // Update fruit physics
-    updateFruits(state);
-
-    // Process input events at this timestep
-    while (inputIndex < inputEvents.length && inputEvents[inputIndex].t <= t) {
-      processInput(state, inputEvents[inputIndex], t);
-      inputIndex++;
+    if (clientScore < MIN_POINTS_PER_FRUIT * fruitsSliced) {
+      return {
+        valid: false,
+        reason: `Score ${clientScore} too low for ${fruitsSliced} slices (min ${MIN_POINTS_PER_FRUIT} pts each)`,
+      };
     }
-
-    // Check combo timeout
-    if (t - state.lastSliceTime > COMBO_TIMEOUT_MS) {
-      state.combo = 0;
+    if (clientScore > MAX_POINTS_PER_FRUIT * fruitsSliced) {
+      return {
+        valid: false,
+        reason: `Score ${clientScore} exceeds ${fruitsSliced} slices × ${MAX_POINTS_PER_FRUIT} max pts`,
+      };
+    }
+    if (typeof comboHighwater === 'number' && comboHighwater > fruitsSliced) {
+      return {
+        valid: false,
+        reason: `Combo ${comboHighwater} exceeds ${fruitsSliced} slices`,
+      };
     }
   }
 
-  // Calculate divergence
-  const divergence = Math.abs(clientScore - state.score) / Math.max(clientScore, 1) * 100;
-  const tolerance = parseFloat(process.env.SCORE_TOLERANCE_PCT || '2.0');
-  const valid = divergence <= tolerance;
+  return { valid: true, reason: null };
+}
 
-  return {
-    serverScore: Math.round(state.score),
-    valid,
-    divergence,
-    rejectionReason: valid ? null : `Score divergence ${divergence.toFixed(2)}% exceeds ${tolerance}% tolerance`,
+/**
+ * Diagnostic replay with client-ported physics. Score parity is not expected
+ * — spawns are random on both sides — so this is telemetry, not a gate.
+ */
+function runDiagnosticReplay(
+  inputEventLog: InputEvent[],
+  gameMode: GameMode,
+  durationSeconds: number
+): number {
+  const state: SimState = {
+    fruits: [],
+    score: 0,
+    combo: 0,
+    lastSliceTimeS: -Infinity,
+    nextSpawnS: (SPAWN_GAP_MS[gameMode] / 1000) * (0.5 + Math.random()),
   };
+
+  // Re-interleave input events with the fruit simulation clock. Input event
+  // timestamps are milliseconds since session start; convert to seconds.
+  const events = [...inputEventLog].sort((a, b) => a.t - b.t);
+  let inputIndex = 0;
+  const prevPoint = { x: events[0]?.x ?? 0, y: events[0]?.y ?? 0 };
+  let hasPrev = false;
+
+  for (let tS = 0; tS <= durationSeconds; tS += SIMULATION_TIMESTEP_S) {
+    // Spawn fruits while there is a fruit still airborne below the apex band.
+    if (tS >= state.nextSpawnS && tS < durationSeconds) {
+      state.fruits.push(spawnFruit());
+      state.nextSpawnS = tS + (SPAWN_GAP_MS[gameMode] / 1000) * (0.5 + Math.random() * 0.9);
+    }
+
+    // Physics step
+    for (const fruit of state.fruits) {
+      if (!fruit.active) continue;
+      fruit.vy += GRAVITY_UNITS_PER_S2 * SIMULATION_TIMESTEP_S;
+      fruit.x += fruit.vx * SIMULATION_TIMESTEP_S;
+      fruit.y += fruit.vy * SIMULATION_TIMESTEP_S;
+      if (fruit.y > 1.15 || fruit.x < -0.1 || fruit.x > 1.1) fruit.active = false;
+    }
+    state.fruits = state.fruits.filter((f) => f.active);
+
+    // Slice: process every input trail point that landed at/before this step,
+    // treating consecutive points as a swipe segment (client geometry).
+    while (inputIndex < events.length && events[inputIndex].t / 1000 <= tS) {
+      const event = events[inputIndex];
+      const point = { x: event.x, y: event.y };
+      if (hasPrev) {
+        sliceWithSegment(state, prevPoint, point, tS);
+      } else {
+        sliceWithSegment(state, point, point, tS);
+      }
+      prevPoint.x = point.x;
+      prevPoint.y = point.y;
+      hasPrev = true;
+      inputIndex++;
+    }
+
+    // Combo timeout
+    if (tS - state.lastSliceTimeS > 1) state.combo = 0;
+  }
+
+  return state.score;
+}
+
+function spawnFruit(): Fruit {
+  const apex = APEX_MIN + Math.random() * APEX_RANGE; // upward travel target
+  const vyMag = Math.sqrt(2 * GRAVITY_UNITS_PER_S2 * apex);
+  let vx = vyMag / Math.tan(((60 + Math.random() * 60) * Math.PI) / 180);
+  const x0 = 0.1 + Math.random() * 0.8;
+  const flightTime = (2 * vyMag) / GRAVITY_UNITS_PER_S2;
+  const landX = x0 + vx * flightTime;
+  if (landX < 0.06) vx = (0.06 - x0) / flightTime;
+  if (landX > 0.94) vx = (0.94 - x0) / flightTime;
+  return { x: x0, y: 1.05, vx, vy: -vyMag, active: true };
+}
+
+/**
+ * Client-style segment/circle slice check for a swipe segment.
+ */
+function sliceWithSegment(state: SimState, from: { x: number; y: number }, to: { x: number; y: number }, tS: number) {
+  for (const fruit of state.fruits) {
+    if (!fruit.active) continue;
+    if (segmentCircleHit(from, to, fruit, FRUIT_RADIUS)) {
+      fruit.active = false;
+      const comboMultiplier = Math.min(1 + state.combo * 0.1, 3);
+      state.score += 10 * comboMultiplier;
+      state.combo++;
+      state.lastSliceTimeS = tS;
+    }
+  }
+}
+
+/** True when the segment p→q passes within `r` of the circle centre. */
+function segmentCircleHit(p: { x: number; y: number }, q: { x: number; y: number }, c: Fruit, r: number): boolean {
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const lenSq = dx * dx + dy * dy;
+  const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((c.x - p.x) * dx + (c.y - p.y) * dy) / lenSq));
+  const ex = p.x + t * dx - c.x;
+  const ey = p.y + t * dy - c.y;
+  return ex * ex + ey * ey <= r * r;
 }
 
 /**
  * Validate input log for impossible patterns (anti-cheat heuristics).
  */
-function validateInputLog(
+export function validateInputLog(
   events: InputEvent[],
   durationSeconds: number
 ): { valid: boolean; reason: string | null } {
@@ -227,13 +309,17 @@ function validateInputLog(
   }
 
   const durationMs = durationSeconds * 1000;
+  // Events can be registered a beat after the run's duration timer expires
+  // (the final swipe of a survival round) — tolerate a short grace window,
+  // otherwise valid runs are rejected wholesale (serverScore 0, divergence 100).
+  const GRACE_MS = 1000;
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
 
     // Check timestamp bounds
-    if (event.t < 0 || event.t > durationMs) {
-      return { valid: false, reason: `Event timestamp ${event.t} outside session bounds [0, ${durationMs}]` };
+    if (event.t < 0 || event.t > durationMs + GRACE_MS) {
+      return { valid: false, reason: `Event timestamp ${event.t} outside session bounds [0, ${durationMs}+${GRACE_MS}]` };
     }
 
     // Check coordinate bounds
@@ -241,7 +327,11 @@ function validateInputLog(
       return { valid: false, reason: `Event coordinates out of bounds: (${event.x}, ${event.y})` };
     }
 
-    // Check for teleportation (impossible coordinate jumps)
+    // Check for teleportation (impossible coordinate jumps mid-stroke).
+    // NOTE: a real finger flick reaches ~10–20 screen-units/s, and lifting
+    // + re-touching elsewhere between strokes is legitimate — so this only
+    // rejects sustained movement faster than any human finger; the gap
+    // between strokes (>SWIPE_GAP_MS) is exempt.
     if (i > 0) {
       const prev = events[i - 1];
       const dt = event.t - prev.t;
@@ -249,19 +339,23 @@ function validateInputLog(
       const dy = Math.abs(event.y - prev.y);
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // Max humanly possible swipe speed: 2.0 screen widths per second
-      const maxDistance = 2.0 * (dt / 1000);
+      // Continuous finger speed cap: 25 screen-units/s (~20×+ a fast flick).
+      const MAX_SPEED_UNITS_PER_S = 25;
+      const maxDistance = dt > SWIPE_GAP_MS ? Infinity : MAX_SPEED_UNITS_PER_S * (dt / 1000);
       if (distance > maxDistance) {
         return { valid: false, reason: `Impossible teleportation detected: ${distance.toFixed(3)} in ${dt}ms` };
       }
     }
 
-    // Check for superhuman input rate (>100 inputs/second sustained)
+    // Check for superhuman input rate. The client's trail sampler runs at
+    // 60Hz+ per touch (and multi-touch doubles it), so legitimate trails can
+    // legally exceed 100 events/second. Flag only clearly synthetic rates
+    // (>200/sec sustained).
     if (i >= 100) {
       const windowStart = events[i - 100];
       const windowDuration = event.t - windowStart.t;
-      if (windowDuration < 1000) {
-        return { valid: false, reason: 'Superhuman input rate detected (>100 inputs/sec)' };
+      if (windowDuration < 500) {
+        return { valid: false, reason: 'Superhuman input rate detected (>200 inputs/sec)' };
       }
     }
   }
@@ -270,111 +364,11 @@ function validateInputLog(
 }
 
 /**
- * Spawn a new fruit with random initial conditions.
- */
-function spawnFruit(state: SimulationState, t: number) {
-  const fruit: Fruit = {
-    id: state.nextFruitId++,
-    x: Math.random(), // Random X position [0, 1]
-    y: 0, // Spawn at bottom
-    vx: (Math.random() - 0.5) * 0.6, // Random horizontal velocity [-0.3, 0.3]
-    vy: 0.8 + Math.random() * 0.4, // Random upward velocity [0.8, 1.2]
-    active: true,
-    spawnTime: t,
-  };
-
-  // Zen mode: slightly slower spawn rate (already handled by spawn interval)
-  // Arcade mode: faster spawn rate (handled by spawn interval)
-
-  state.fruits.push(fruit);
-}
-
-/**
- * Update fruit positions using simple Euler integration.
- */
-function updateFruits(state: SimulationState) {
-  for (const fruit of state.fruits) {
-    if (!fruit.active) continue;
-
-    // Apply gravity
-    fruit.vy += GRAVITY * SIMULATION_TIMESTEP_MS;
-
-    // Update position
-    fruit.x += fruit.vx * SIMULATION_TIMESTEP_MS;
-    fruit.y += fruit.vy * SIMULATION_TIMESTEP_MS;
-
-    // Deactivate if off-screen
-    if (fruit.y < -0.2 || fruit.y > 1.2 || fruit.x < -0.2 || fruit.x > 1.2) {
-      fruit.active = false;
-    }
-  }
-
-  // Remove inactive fruits (garbage collection)
-  state.fruits = state.fruits.filter(f => f.active);
-}
-
-/**
- * Process a player input event (swipe) and check for collisions.
- */
-function processInput(state: SimulationState, input: InputEvent, t: number) {
-  let slicedThisInput = false;
-
-  for (const fruit of state.fruits) {
-    if (!fruit.active) continue;
-
-    // Check collision
-    const dx = Math.abs(input.x - fruit.x);
-    const dy = Math.abs(input.y - fruit.y);
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Convert normalized distance to pixels (assuming 1920x1080 screen)
-    const pixelDistance = distance * 1920;
-
-    if (pixelDistance < COLLISION_THRESHOLD) {
-      // Fruit sliced!
-      fruit.active = false;
-      slicedThisInput = true;
-
-      // Calculate score
-      let points = BASE_FRUIT_SCORE;
-
-      // Combo multiplier
-      const comboMultiplier = Math.min(1 + state.combo * COMBO_MULTIPLIER_STEP, MAX_COMBO_MULTIPLIER);
-      points *= comboMultiplier;
-
-      // Velocity bonus
-      if (input.velocity > VELOCITY_BONUS_THRESHOLD) {
-        points *= VELOCITY_BONUS_MULTIPLIER;
-      }
-
-      state.score += points;
-      state.combo++;
-      state.lastSliceTime = t;
-
-      // Only slice one fruit per input (client behavior)
-      break;
-    }
-  }
-
-  // Reset combo if no slice and timeout exceeded
-  if (!slicedThisInput && t - state.lastSliceTime > COMBO_TIMEOUT_MS) {
-    state.combo = 0;
-  }
-}
-
-/**
- * Generate next fruit spawn time with random jitter.
- */
-function randomSpawnTime(currentTime: number): number {
-  const jitter = (Math.random() - 0.5) * 2 * FRUIT_SPAWN_JITTER_MS;
-  return currentTime + FRUIT_SPAWN_INTERVAL_MS + jitter;
-}
-
-/**
  * Export for testing
  */
 export const _testing = {
   validateInputLog,
-  SIMULATION_TIMESTEP_MS,
-  COLLISION_THRESHOLD,
+  SIMULATION_TIMESTEP_S,
+  FRUIT_RADIUS,
+  SPAWN_GAP_MS,
 };
