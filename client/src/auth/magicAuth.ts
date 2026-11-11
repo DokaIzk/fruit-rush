@@ -160,13 +160,56 @@ export async function loginWithSocial(provider: SocialProvider): Promise<WalletS
   }
 }
 
+/**
+ * Decode a Magic DID token's claim segment (proof.claim.signature base64url
+ * triple) and return its expiry as epoch ms, or null when unreadable.
+ * Used to catch a stale cached token client-side — Magic's admin SDK rejects
+ * expired tokens with a 401, so an expired token must never be sent.
+ */
+export function didTokenExpiryMs(token: string): number | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const claim = JSON.parse(atob(parts[1])) as { ext?: number }
+    return typeof claim.ext === 'number' ? claim.ext * 1000 : null
+  } catch {
+    return null
+  }
+}
+
 /** Current Magic DID token for authenticated backend requests. */
 export async function getMagicIdToken(): Promise<string | null> {
   if (!isMagicConfigured()) return null
+  // The Magic SDK iframe can hang indefinitely (HMR re-init, blocked network);
+  // a wedged call must surface as "not signed in" rather than stall validation.
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
+    Promise.race([
+      promise,
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), ms)),
+    ])
   try {
     const magic = getMagic()
-    if (!(await magic.user.isLoggedIn())) return null
-    return await magic.user.getIdToken()
+    const loggedIn = await withTimeout(magic.user.isLoggedIn(), 5_000)
+    if (!loggedIn) return null
+    const token = await withTimeout(magic.user.getIdToken(), 10_000)
+    if (!token) return null
+    // A cached token past its `ext` claim gets a 401 from the backend. Try a
+    // silent relogin (no OTP UI) for a fresh token; if that fails, treat the
+    // player as signed out so the email sign-in prompt shows instead.
+    const expiry = didTokenExpiryMs(token)
+    if (expiry != null && expiry <= Date.now()) {
+      console.log(`[auth] Magic DID token expired at ${new Date(expiry).toISOString()} — refreshing silently`)
+      try {
+        // Regenerates a fresh DID token from the persisted session (no OTP UI).
+        const fresh = await withTimeout(magic.user.generateIdToken({ lifespan: 1_800 }), 10_000)
+        if (fresh) return fresh
+      } catch {
+        /* fall through to signed-out */
+      }
+      console.log('[auth] silent token refresh failed — treating player as signed out')
+      return null
+    }
+    return token
   } catch {
     return null
   }

@@ -168,6 +168,9 @@ export default function App() {
   /** Bumps on every Play entry so the round always mounts with the mode just picked. */
   const [playEpoch, setPlayEpoch] = useState(0)
   const [lastResult, setLastResult] = useState<GameSessionResult | null>(null)
+  // Mirror of the validation outcome so mint can await the in-flight request
+  // without depending on which render's closure it was captured from.
+  const validateWaitersRef = useRef<Array<(outcome: { sessionId: string | null; valid: boolean | null }) => void>>([])
   const [personalBest, setPersonalBest] = useState(loadPersonalBest)
   const [mintedId, setMintedId] = useState<number | null>(null)
   const [mintStep, setMintStep] = useState<MintStep>('idle')
@@ -252,12 +255,14 @@ export default function App() {
       // No wallet address available right now — the email sign-in prompt can
       // provide one (its effect re-runs validation once the address lands).
       console.log('[validate] skipped: no Magic token')
+      flushValidateWaiters({ sessionId: null, valid: null })
       setValidateUi('email-prompt')
       return
     }
     void getMagicIdToken().then((token) => {
       if (!token) {
         console.log('[validate] skipped: no Magic token')
+        flushValidateWaiters({ sessionId: null, valid: null })
         setValidateUi('email-prompt')
         return
       }
@@ -296,6 +301,7 @@ export default function App() {
           backendSessionId: validation.sessionId,
           backendValidation: validation.valid ? 'valid' : 'invalid',
         } : current)
+        flushValidateWaiters({ sessionId: validation.sessionId, valid: validation.valid })
         if (!validation.valid) showToast(validation.rejectionReason || 'Score could not be validated')
       }).catch((error: unknown) => {
         if (validateTimerRef.current != null) {
@@ -306,10 +312,36 @@ export default function App() {
         setLastResult((current) => current ? { ...current, backendValidation: 'unavailable' } : current)
         const message = error instanceof Error ? error.message : 'Backend unavailable'
         console.log('[validate] request failed:', message)
+        flushValidateWaiters({ sessionId: null, valid: null })
         showToast(message)
       })
     })
   }, [wallet.address, personalBest, showToast])
+
+  /** Resolve every mint-side waiter with the latest validation outcome. */
+  const flushValidateWaiters = (outcome: { sessionId: string | null; valid: boolean | null }) => {
+    const waiters = validateWaitersRef.current
+    validateWaitersRef.current = []
+    for (const resolve of waiters) resolve(outcome)
+  }
+
+  /**
+   * Promise that resolves to the validated session id once the in-flight
+   * (or re-kicked) /session/validate lands; null on timeout or invalid run.
+   */
+  const waitForValidatedSession = (timeoutMs: number): Promise<string | null> =>
+    new Promise((resolve) => {
+      let settled = false
+      const finish = (value: string | null) => {
+        if (settled) return
+        settled = true
+        resolve(value)
+      }
+      validateWaitersRef.current.push((outcome) => {
+        finish(outcome.valid ? outcome.sessionId : null)
+      })
+      window.setTimeout(() => finish(null), timeoutMs)
+    })
 
   /**
    * When the player finishes email sign-in on the boast screen (or a Magic
@@ -746,14 +778,52 @@ export default function App() {
                 showToast(saveProgressToast(wallet.inMiniPay))
                 return
               }
-              if (!lastResult.backendSessionId) {
-                if (validateUi === 'email-prompt') {
-                  showToast('Sign in with email to validate this run')
-                } else {
-                  showToast('Score is still being validated')
+              // Mint needs the validated session id. If validation hasn't
+              // landed yet (in-flight, retryable, or timing out), wait for it
+              // here instead of failing with a transient toast — clicking
+              // Mint mid-validation triggers validation and waits for it.
+              let sessionId: string | null = lastResult?.backendSessionId ?? null
+              if (!sessionId) {
+                // Validation hasn't landed for this run yet. Clicking Mint
+                // re-kicks it (idempotent thanks to the backend rate limit)
+                // and waits for the outcome instead of failing with a
+                // transient toast while the request is still in flight.
+                setMintStep('validating')
+                const pending = pendingValidateRef.current ?? (lastResult
+                  ? {
+                      playerId: lastResult.playerId,
+                      score: lastResult.score,
+                      mode: lastResult.mode,
+                      comboHighwater: lastResult.comboHighwater,
+                      durationSeconds: lastResult.durationSeconds,
+                      timestamp: lastResult.timestamp,
+                      isPersonalBest: false,
+                      fruitsSliced: lastResult.fruitsSliced,
+                      fruitsMissed: lastResult.fruitsMissed,
+                      bombsHit: lastResult.bombsHit,
+                      criticalSlices: lastResult.criticalSlices,
+                      accuracy: lastResult.accuracy,
+                      inputEventLog: lastResult.inputEventLog ?? [],
+                    }
+                  : null)
+                if (pending) validateRun(pending)
+                sessionId = await waitForValidatedSession(15_000)
+                setMintStep('idle')
+                if (!sessionId) {
+                  if (validateUi === 'email-prompt') {
+                    showToast('Sign in with email to mint this boast')
+                  } else {
+                    const outcome = lastResult?.backendValidation
+                    showToast(
+                      outcome === 'invalid'
+                        ? 'Your run didn’t pass validation — play again and retry'
+                        : 'Validation didn’t finish — try again in a moment'
+                    )
+                  }
+                  return
                 }
-                return
               }
+              if (!sessionId) return
               const token = await getMagicIdToken()
               if (!token) {
                 showToast('Email sign-in is required to save a boast')
@@ -761,7 +831,7 @@ export default function App() {
               }
               setMintStep('signing')
               try {
-                const sig: BoastSignature = await signBoast(token, lastResult.backendSessionId)
+                const sig: BoastSignature = await signBoast(token, sessionId)
                 const walletSession = await resolveWriteProvider()
                 if (!walletSession) {
                   throw new Error('Connect a wallet with cUSD to mint the boast')
@@ -777,7 +847,15 @@ export default function App() {
                 showToast('Boast minted on-chain 🎉')
               } catch (error) {
                 setMintStep('idle')
-                showToast(describeBoastError(error))
+                const message = error instanceof Error ? error.message : String(error)
+                if (/authentication failed|401|expired|sign-in|sign in/i.test(message)) {
+                  // Auth failure (typically a stale Magic session) — surface the
+                  // email band instead of a generic confusing toast.
+                  setValidateUi('email-prompt')
+                  showToast('Email session expired — sign in again to mint this boast')
+                } else {
+                  showToast(describeBoastError(error))
+                }
               }
             }}
             onShare={async () => {

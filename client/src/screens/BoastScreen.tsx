@@ -3,7 +3,7 @@ import { Close } from '../components/icons'
 import type { ReactNode, CSSProperties } from 'react'
 import '../styles/boast.css'
 
-export type MintStep = 'idle' | 'signing' | 'approving' | 'minting'
+export type MintStep = 'idle' | 'validating' | 'signing' | 'approving' | 'minting'
 
 /** Validation status surfaced by App: nothing pending, email sign-in band, or watchdog retry band. */
 export type ValidateUiState = 'none' | 'email-prompt' | 'timed-out'
@@ -32,6 +32,7 @@ interface BoastScreenProps {
 
 const STEP_LABELS: Record<MintStep, string> = {
   idle: 'Mint boast',
+  validating: 'Validating run…',
   signing: 'Signing run…',
   approving: 'Approving cUSD…',
   minting: 'Minting boast…',
@@ -40,7 +41,6 @@ const STEP_LABELS: Record<MintStep, string> = {
 export function BoastScreen({
   onMint,
   onShare,
-  onCopyLink,
   onDismiss,
   mintedId = null,
   score = null,
@@ -127,9 +127,10 @@ export function BoastScreen({
             Mint to unlock share
           </button>
         )}
-        <button type="button" className="btn boast__copy" onClick={onCopyLink}>
+        {/* Copy link hidden for now — share is the primary post-mint action. */}
+        {/* <button type="button" className="btn boast__copy" onClick={onCopyLink}>
           Copy link
-        </button>
+        </button> */}
       </section>
     </main>
   )
