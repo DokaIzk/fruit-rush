@@ -15,7 +15,7 @@
   --text-muted: var(--cream-dim);
 
   /* Accents aliases → theme */
-  --accent-lime: var(--lime);
+  --accent-lime: var(--gold); /* renamed semantics; kept for compat */
   --accent-orange: var(--orange);
   --accent-orange-deep: #d9500f;
 

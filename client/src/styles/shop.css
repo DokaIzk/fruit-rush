@@ -25,10 +25,10 @@
   cursor: pointer;
 }
 
-/* Active filter — lime fill, dark text */
+/* Active filter — orange fill, dark text */
 .shop-filters__chip[aria-selected='true'] {
-  background: var(--lime);
-  color: #14330f;
+  background: var(--orange);
+  color: #2a1608;
   border-color: transparent;
 }
 

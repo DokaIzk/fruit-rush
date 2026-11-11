@@ -17,10 +17,9 @@
   --wood-edge: #2a1608;
 
   /* Accents */
-  --lime: #c8f04a;
+  --lime: var(--gold); /* legacy alias — neon lime retired */
   --orange: #ff7a1a;
   --red: #e0432a;
-  --green-btn: #5cc23a;
 
   /* Text */
   --cream: #f4efe2;
@@ -72,9 +71,9 @@ body {
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
 .btn {
-  --c1: var(--green-btn);
-  --c2: #4fb22c;
-  --c3: #2a6b14;
+  --c1: #ffa54a;
+  --c2: #ff6a10;
+  --c3: #9a3a06;
 
   display: inline-flex;
   align-items: center;
@@ -141,8 +140,8 @@ body {
 }
 
 .round-btn--green {
-  background: radial-gradient(circle at 30% 25%, #b6f06e, var(--green-btn) 62%);
-  color: #14330f;
+  background: radial-gradient(circle at 30% 25%, #ffe08a, var(--gold) 62%);
+  color: #2a1608;
 }
 
 /* ── Pills ───────────────────────────────────────────────────────────────── */
@@ -153,8 +152,8 @@ body {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: var(--lime);
-  color: #14330f;
+  background: var(--orange);
+  color: #2a1608;
   font-family: var(--font-body);
   font-size: 0.72rem;
   font-weight: 800;
@@ -178,8 +177,8 @@ body {
   z-index: 1;
   padding: 4px 12px 4px 8px;
   clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%);
-  background: var(--c, var(--lime));
-  color: #14330f;
+  background: var(--c, var(--orange));
+  color: #2a1608;
   font-family: var(--font-body);
   font-size: 0.68rem;
   font-weight: 800;

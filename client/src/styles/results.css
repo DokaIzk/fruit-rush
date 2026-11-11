@@ -37,7 +37,7 @@
   margin: 0.45rem 0 0;
   font-size: 3.5rem;
   line-height: 1;
-  color: var(--lime);
+  color: var(--gold);
   letter-spacing: 0.01em;
 }
 
@@ -104,7 +104,7 @@
 }
 
 .rs-card__loot span:last-child {
-  color: var(--lime);
+  color: var(--gold);
 }
 
 .rs-card__bonuses {
@@ -139,8 +139,8 @@
 }
 
 .rs-bonus.is-on {
-  background: color-mix(in srgb, var(--lime) 14%, transparent);
-  border-color: color-mix(in srgb, var(--lime) 45%, var(--wood-edge));
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--wood-edge));
 }
 
 .rs-bonus.is-off {
@@ -176,7 +176,7 @@
 }
 
 .rs-bonus.is-on .rs-bonus__gain {
-  color: var(--lime);
+  color: var(--gold);
 }
 
 .rs-card__actions {

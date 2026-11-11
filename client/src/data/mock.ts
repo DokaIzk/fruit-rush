@@ -48,7 +48,7 @@ export const COSMETICS: CosmeticItem[] = [
     owned: true,
     equipped: true,
     blurb: 'Watermelon, mango, lime — the originals.',
-    accent: 'var(--accent-lime)',
+    accent: 'var(--gold)',
   },
   {
     id: 'fruit-neon',

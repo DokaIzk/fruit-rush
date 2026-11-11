@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { designArt } from '../assets/designs'
+import type { CSSProperties } from 'react'
+import { uiArt } from '../assets/designs'
 import { BrandMark } from '../components/BrandMark'
 
 interface OnboardingScreenProps {
@@ -33,10 +34,13 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
   const last = index === SLIDES.length - 1
 
   return (
-    <section className="flow-screen onboarding-screen">
+    <section
+      className="flow-screen onboarding-screen"
+      style={{ '--screen-bg': `url(${uiArt.woodBg})` } as CSSProperties}
+    >
       <img
         className="flow-screen__art flow-screen__art--dim"
-        src={designArt.play}
+        src={uiArt.woodBg}
         alt=""
         draggable={false}
         aria-hidden
@@ -68,7 +72,7 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
         </div>
         <button
           type="button"
-          className="btn-primary"
+          className="btn btn--orange"
           onClick={() => (last ? onDone() : setIndex((i) => i + 1))}
         >
           {last ? 'Get started' : 'Next'}

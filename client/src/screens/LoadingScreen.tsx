@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { uiArt } from '../assets/designs'
 import type { LoadProgress } from '../assets/preload'
 
 interface LoadingScreenProps {
@@ -39,9 +41,14 @@ export function LoadingScreen({ onDone }: LoadingScreenProps) {
   const pct = Math.round(progress.progress * 100)
 
   return (
-    <section className="flow-screen loading-screen" aria-busy="true" aria-live="polite">
+    <section
+      className="flow-screen loading-screen"
+      style={{ '--screen-bg': `url(${uiArt.woodBg})` } as CSSProperties}
+      aria-busy="true"
+      aria-live="polite"
+    >
       <div className="loading-screen__panel">
-        <p className="loading-screen__brand display">Fruit Rush</p>
+        <img className="loading-screen__brand" src={uiArt.logo} alt="Fruit Rush" draggable={false} />
         <p className="loading-screen__label">{progress.label}</p>
         <div
           className="loading-screen__track"
